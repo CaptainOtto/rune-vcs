@@ -1,0 +1,28 @@
+
+[package]
+name = "rune-cli"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+clap_complete = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+walkdir = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+rune-core = { path = "../rune-core" }
+rune-store = { path = "../rune-store" }
+rune-lfs = { path = "../rune-lfs" }
+rune-remote = { path = "../rune-remote" }
+axum = { workspace = true }
+
+rune-delta = { path = "../rune-delta" }
+blake3 = { workspace = true }
+whoami = "1"
+
+serde_yaml = "0.9"

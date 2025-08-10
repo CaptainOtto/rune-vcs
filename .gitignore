@@ -1,0 +1,48 @@
+# Binaries and build artifacts
+/target
+**/*.rs.bk
+
+# Cargo lock for libs (optional keep for apps)
+Cargo.lock
+
+# OS-specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+Desktop.ini
+
+# IDEs & Editors
+.idea/
+.vscode/
+*.code-workspace
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*.swn
+*.swm
+
+# Backups
+*~
+*.bak
+*.old
+
+# Test artifacts
+/tests/tmp/
+coverage/
+
+# Rune-specific
+.rune/
+.rune-lfs/
+rune-lfs-chunks/
+rune-locks/
+
+# API/Server runtime data
+shrine-data/
+api-data/

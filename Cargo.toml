@@ -1,0 +1,38 @@
+
+[workspace]
+resolver = "2"
+members = [
+  "crates/rune-core",
+  "crates/rune-store",
+  "crates/rune-cli",
+  "crates/rune-lfs",
+  "crates/rune-remote",
+  "crates/rune-pack",
+  "crates/rune-delta",
+]
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+version = "0.0.1"
+authors = ["Rune Maintainers <dev@example.invalid>"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock","std"] }
+walkdir = "2"
+clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+reqwest = { version = "0.12", features = ["json","gzip","rustls-tls"] }
+tokio = { version = "1", features = ["full"] }
+axum = "0.7"
+blake3 = "1"
+glob = "0.3"
+zstd = "0.13"
+toml = "0.8"

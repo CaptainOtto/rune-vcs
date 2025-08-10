@@ -1,0 +1,23 @@
+
+{
+  "version": "v0.0.1",
+  "description": "Rune — modern DVCS",
+  "homepage": "https://github.com/CaptainOtto/rune-vcs",
+  "license": "Apache-2.0",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/CaptainOtto/rune-vcs/releases/download/v0.0.1/rune-v0.0.1-x86_64-pc-windows-msvc.zip",
+      "bin": [ "rune.exe" ]
+    }
+  }
+,
+  "post_install": [
+    "$comp = "$dir\rune.ps1"",
+    "if (Test-Path $comp) {",
+    "  if (!(Test-Path $PROFILE)) { New-Item -Type File -Force $PROFILE | Out-Null }",
+    "  $line = ". $comp"",
+    "  if (-not (Select-String -Path $PROFILE -Pattern [regex]::Escape($line) -Quiet)) { Add-Content -Path $PROFILE -Value $line }",
+    "  Write-Host 'PowerShell completions enabled (restart shell).'", 
+    "}"
+  ]
+}
