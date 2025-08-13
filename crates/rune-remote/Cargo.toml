@@ -14,3 +14,7 @@ bytes = "1"
 walkdir = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
+hyper = "1.6.0"
+
+[dev-dependencies]
+tempfile = "3.8"

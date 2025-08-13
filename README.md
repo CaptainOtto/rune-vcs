@@ -9,12 +9,15 @@
 
 ## ✨ Features
 
-- **Hybrid Git + P4 design** – the flexibility of Git with Perforce-style file locking
-- **Built-in Large File Support (LFS)** – chunked storage for huge assets
-- **Cross-platform** – macOS, Windows, Linux
-- **Embedded Mode** – one-command local server with LFS + locks
-- **JSON API** – simple integration with custom UIs
-- **Fast, minimal CLI** – no unnecessary complexity
+- **🎨 Professional Interface** – Beautiful, colored CLI output with helpful guidance
+- **🔄 Hybrid Git + P4 Design** – Distributed workflow with Perforce-style file locking
+- **📦 Built-in Large File Support** – No setup needed, chunked storage for huge assets
+- **🌐 Cross-platform** – macOS, Windows, Linux with single binary deployment
+- **🔧 Embedded Mode** – One command starts full team server with LFS + locks
+- **🔌 JSON API** – Clean REST interface for custom tools and integrations
+- **⚡ Fast & Minimal** – Essential commands only, no unnecessary complexity
+- **🔒 File Locking** – Prevent binary asset conflicts like Perforce
+- **📝 Git-Compatible Workflow** – Familiar commands: init, add, commit, branch, etc.
 
 ---
 
@@ -30,41 +33,69 @@ cargo build --release
 
 # Optional: Install globally
 cargo install --path .
-🚀 Quick Start
-bash
-Copy
-Edit
+```
+
+---
+
+## 🚀 Quick Start
+
+```bash
 # Init new repo
 rune init
 
-# Track large files
+# Track large files (built-in LFS)
 rune lfs track "*.psd"
+rune lfs track "*.mp4"
 
-# Commit
+# Add and commit (just like Git!)
 rune add .
 rune commit -m "Initial commit"
 
-# Start embedded mode
+# Start embedded server for team collaboration
 rune api --with-shrine
-📚 Documentation
-Overview
+```
 
-CLI Commands
+### 🔄 Migrating from Git?
 
-API Reference
+**[→ See our complete Git replacement guide](docs/git-replacement-guide.md)**
 
-LFS & Locks
+Common commands work the same:
 
-Embedded Mode
+- `git init` → `rune init`
+- `git add .` → `rune add .`
+- `git commit -m "msg"` → `rune commit -m "msg"`
+- `git status` → `rune status`
+- `git log` → `rune log`
+
+**Plus built-in advantages:**
+
+- ✅ **Large files work out-of-the-box** (no Git LFS setup)
+- ✅ **File locking for binary assets** (like Perforce)
+- ✅ **Professional colored output** with helpful guidance
+- ✅ **One command starts team server** (embedded mode)
+- ✅ **Clean JSON API** for integrations
+- ✅ **Advanced file operations** (move, reset, show, diff)
+- ✅ **Modern Rust architecture** for speed and reliability
+
+---
+
+## 📚 Documentation
+
+- **[Git Replacement Guide](docs/git-replacement-guide.md)** - Complete migration walkthrough
+- [Overview](docs/overview.md) - Core concepts and philosophy
+- [CLI Commands](docs/cli-commands.md) - Full command reference
+- [API Reference](docs/api-reference.md) - HTTP API documentation
+- [LFS & Locks](docs/lfs-and-locks.md) - Large file handling
+- [Embedded Mode](docs/embedded-mode.md) - Local server setup
 
 🛠 Roadmap
- GUI client (Rune Desktop) – minimal GitHub Desktop + P4 hybrid
+GUI client (Rune Desktop) – minimal GitHub Desktop + P4 hybrid
 
- Remote hosting service
+Remote hosting service
 
- Plugin system
+Plugin system
 
- Visual diff for large files
+Visual diff for large files
 
 🤝 Contributing
 We welcome issues, feature requests, and PRs!
@@ -72,4 +103,7 @@ See INSTRUCTIONS.md for current status and open tasks.
 
 📜 License
 MIT
+
+```
+
 ```

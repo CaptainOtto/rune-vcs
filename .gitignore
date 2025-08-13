@@ -5,6 +5,31 @@
 # Cargo lock for libs (optional keep for apps)
 Cargo.lock
 
+# Test files and temp directories
+/test_files/
+/temp/
+*.tmp
+*.temp
+test_*.rs
+test_*.py
+test_*.js
+test_*.go
+*.test
+main.go
+app.js
+hello.py
+utils.py
+component.tsx
+hello.cpp
+
+# Environment and secrets
+.env
+.env.*
+**/secret*
+**/key*
+**/*password*
+**/*token*
+
 # OS-specific
 .DS_Store
 Thumbs.db

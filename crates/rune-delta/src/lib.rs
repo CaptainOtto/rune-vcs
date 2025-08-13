@@ -25,7 +25,7 @@ pub fn make(base:&[u8], new:&[u8], chunk:usize)->Result<Patch>{
             let win = &new[i..end];
             if let Some(pos_list) = map.get(win){
                 // choose first match for simplicity
-                let mut best_off = pos_list[0];
+                let best_off = pos_list[0];
                 let mut match_len = w;
                 // extend match forward
                 while best_off+match_len < base.len() && i+match_len < new.len() && base[best_off+match_len]==new[i+match_len] { match_len+=1; }

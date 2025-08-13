@@ -26,3 +26,5 @@ blake3 = { workspace = true }
 whoami = "1"
 
 serde_yaml = "0.9"
+colored = "2.1"
+console = "0.15"
