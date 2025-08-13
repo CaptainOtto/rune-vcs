@@ -9,6 +9,7 @@ use colored::*;
 use style::{init_colors, Style};
 mod intelligence;
 mod performance;
+mod locking;
 use performance::PerformanceEngine;
 
 #[derive(Parser, Debug)]
@@ -125,6 +126,9 @@ enum Cmd {
         #[command(subcommand)]
         cmd: ConfigCmd,
     },
+    /// Enable intelligent file locking and conflict prevention
+    #[command(subcommand)]
+    Lock(crate::locking::LockCmd),
 }
 
 #[derive(Subcommand, Debug)]
@@ -423,6 +427,40 @@ async fn main() -> anyhow::Result<()> {
             );
             println!(
                 "  {} rune api --with-shrine     # Start team server",
+                Style::status_added()
+            );
+            println!("\n{}", "🔐 Intelligent File Locking:".bold());
+            println!(
+                "  {} rune lock detect           # Auto-detect project type",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune lock lock <files>     # Intelligent file locking",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune lock status           # View lock status",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune lock lfs-suggestions  # Get LFS recommendations",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune lock analyze <files>  # Analyze conflict risk",
+                Style::status_added()
+            );
+            println!("\n{}", "🔮 AI-Powered Intelligence:".bold());
+            println!(
+                "  {} rune config intelligence   # View AI features",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune config health         # Repository health analysis",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune config insights       # Predictive issue detection",
                 Style::status_added()
             );
             println!(
@@ -742,6 +780,10 @@ async fn main() -> anyhow::Result<()> {
         
         Cmd::Config { cmd } => {
             handle_config_command(cmd)?;
+        }
+        
+        Cmd::Lock(cmd) => {
+            locking::handle_lock_command(cmd)?;
         }
 
         Cmd::Diff { target } => {

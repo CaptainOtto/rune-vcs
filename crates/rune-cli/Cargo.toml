@@ -23,7 +23,7 @@ axum = { workspace = true }
 
 rune-delta = { path = "../rune-delta" }
 blake3 = { workspace = true }
-whoami = "1"
+whoami = "1.4"
 
 serde_yaml = "0.9"
 colored = "2.1"
