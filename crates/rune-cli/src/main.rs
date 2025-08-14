@@ -269,6 +269,74 @@ enum IntelligenceCmd {
 }
 
 #[derive(Subcommand, Debug)]
+enum SubmoduleCmd {
+    /// List all submodules
+    List,
+    /// Add a new submodule
+    Add {
+        #[arg(help = "Repository URL")]
+        url: String,
+        #[arg(help = "Local path for submodule")]
+        path: String,
+        #[arg(long, help = "Branch to track")]
+        branch: Option<String>,
+    },
+    /// Update submodules
+    Update {
+        #[arg(long, help = "Update recursively")]
+        recursive: bool,
+        #[arg(long, help = "Initialize uninitialized submodules")]
+        init: bool,
+    },
+    /// Remove a submodule
+    Remove {
+        #[arg(help = "Submodule path to remove")]
+        path: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum HooksCmd {
+    /// Install default hooks
+    Install,
+    /// List available hooks
+    List,
+    /// Run a specific hook manually
+    Run {
+        #[arg(help = "Hook name to run")]
+        name: String,
+    },
+    /// Configure hook settings
+    Config {
+        #[arg(help = "Hook name")]
+        hook: String,
+        #[arg(long, help = "Enable or disable hook")]
+        enable: Option<bool>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum SignCmd {
+    /// Setup GPG signing
+    Setup {
+        #[arg(long, help = "GPG key ID to use")]
+        key: Option<String>,
+    },
+    /// Verify commit signatures
+    Verify {
+        #[arg(help = "Commit hashes to verify")]
+        commits: Vec<String>,
+    },
+    /// Create a signed commit
+    Commit {
+        #[arg(short, long, help = "Commit message")]
+        message: String,
+        #[arg(long, help = "GPG key ID to use")]
+        key: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 enum Cmd {
     /// Run local JSON API server
     Api {
@@ -411,6 +479,54 @@ enum Cmd {
     Intelligence {
         #[command(subcommand)]
         cmd: IntelligenceCmd,
+    },
+    /// Advanced VCS operations (rebase, cherry-pick, submodules, hooks, signing)
+    Rebase {
+        #[arg(help = "Target commit for rebase")]
+        target: String,
+        #[arg(long, help = "Start interactive rebase")]
+        interactive: bool,
+        #[arg(long, help = "Rebase onto specific commit")]
+        onto: Option<String>,
+        #[arg(long, help = "Preserve merge commits")]
+        preserve_merges: bool,
+        #[arg(long, help = "Automatically squash fixup commits")]
+        autosquash: bool,
+    },
+    /// Cherry-pick commits from other branches
+    CherryPick {
+        #[arg(help = "Commit hash to cherry-pick")]
+        commit: String,
+        #[arg(long, help = "Stage changes but don't commit")]
+        no_commit: bool,
+        #[arg(long, help = "Edit the commit message")]
+        edit: bool,
+        #[arg(long, help = "Add Signed-off-by line")]
+        signoff: bool,
+        #[arg(long, help = "Merge strategy to use")]
+        strategy: Option<String>,
+    },
+    /// Cherry-pick a range of commits
+    CherryPickRange {
+        #[arg(help = "Start commit (exclusive)")]
+        start: String,
+        #[arg(help = "End commit (inclusive)")]
+        end: String,
+    },
+    /// Manage submodules
+    Submodule {
+        #[command(subcommand)]
+        cmd: SubmoduleCmd,
+    },
+    /// Manage repository hooks
+    Hooks {
+        #[command(subcommand)]
+        cmd: HooksCmd,
+    },
+    /// GPG signing operations
+    Sign {
+        #[command(subcommand)]
+        cmd: SignCmd,
     },
     /// Configure Rune intelligence and features
     Config {
@@ -1512,6 +1628,27 @@ async fn main() -> anyhow::Result<()> {
                 "  {} rune config insights       # Predictive issue detection",
                 Style::status_added()
             );
+            println!("\n{}", "⚡ Advanced VCS Features:".bold());
+            println!(
+                "  {} rune rebase --interactive HEAD~3  # Interactive rebase",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune cherry-pick <commit>  # Cherry-pick commits",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune submodule add <url>   # Add submodules",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune hooks install         # Setup commit hooks",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune sign setup --key <id> # GPG commit signing",
+                Style::status_added()
+            );
             println!(
                 "\n{}",
                 "For complete documentation, see: docs/git-replacement-guide.md".dimmed()
@@ -1879,6 +2016,73 @@ async fn main() -> anyhow::Result<()> {
                 }
                 IntelligenceCmd::Status => {
                     return commands::intelligence::show_intelligence_status().map_err(|e| e.into());
+                }
+            }
+        }
+        Cmd::Rebase { target, interactive, onto, preserve_merges, autosquash } => {
+            let options = commands::advanced::RebaseOptions {
+                interactive,
+                onto,
+                preserve_merges,
+                autosquash,
+            };
+            return commands::advanced::interactive_rebase(target, options).map_err(|e| e.into());
+        }
+        Cmd::CherryPick { commit, no_commit, edit, signoff, strategy } => {
+            let options = commands::advanced::CherryPickOptions {
+                no_commit,
+                edit,
+                signoff,
+                strategy,
+            };
+            return commands::advanced::cherry_pick(commit, options).map_err(|e| e.into());
+        }
+        Cmd::CherryPickRange { start, end } => {
+            return commands::advanced::cherry_pick_range(start, end).map_err(|e| e.into());
+        }
+        Cmd::Submodule { cmd } => {
+            match cmd {
+                SubmoduleCmd::List => {
+                    commands::advanced::list_submodules()?;
+                }
+                SubmoduleCmd::Add { url, path, branch } => {
+                    commands::advanced::add_submodule(url, path, branch)?;
+                }
+                SubmoduleCmd::Update { recursive, init } => {
+                    commands::advanced::update_submodules(recursive, init)?;
+                }
+                SubmoduleCmd::Remove { path: _path } => {
+                    println!("{}", "🗑️  Submodule removal not yet implemented".yellow());
+                }
+            }
+        }
+        Cmd::Hooks { cmd } => {
+            match cmd {
+                HooksCmd::Install => {
+                    commands::advanced::install_hooks()?;
+                }
+                HooksCmd::List => {
+                    commands::advanced::list_hooks()?;
+                }
+                HooksCmd::Run { name } => {
+                    let context = std::collections::HashMap::new();
+                    commands::advanced::run_hook(name, context)?;
+                }
+                HooksCmd::Config { hook: _hook, enable: _enable } => {
+                    println!("{}", "⚙️  Hook configuration not yet implemented".yellow());
+                }
+            }
+        }
+        Cmd::Sign { cmd } => {
+            match cmd {
+                SignCmd::Setup { key } => {
+                    commands::advanced::setup_gpg_signing(key)?;
+                }
+                SignCmd::Verify { commits } => {
+                    commands::advanced::verify_signatures(commits)?;
+                }
+                SignCmd::Commit { message, key } => {
+                    commands::advanced::create_signed_commit(message, key)?;
                 }
             }
         }
