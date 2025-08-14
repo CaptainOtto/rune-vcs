@@ -24,6 +24,25 @@ impl Style {
         eprintln!("{} {}", "✗".red().bold(), msg);
     }
 
+    /// Print a verbose/debug message
+    pub fn verbose(msg: &str) {
+        println!("{} {}", "🔍".dimmed(), msg.dimmed());
+    }
+
+    /// Print a progress message
+    pub fn progress(msg: &str) {
+        print!("{} {}...\r", "⏳".cyan(), msg);
+        use std::io::{self, Write};
+        io::stdout().flush().ok();
+    }
+
+    /// Clear progress line
+    pub fn clear_progress() {
+        print!("\r\x1b[2K");
+        use std::io::{self, Write};
+        io::stdout().flush().ok();
+    }
+
     /// Print a commit hash with styling
     pub fn commit_hash(hash: &str) -> ColoredString {
         hash.yellow().bold()

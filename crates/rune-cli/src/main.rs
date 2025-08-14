@@ -10,9 +10,86 @@ use style::{init_colors, Style};
 use rune_performance::PerformanceEngine;
 use rune_core::intelligence::{IntelligentFileAnalyzer, InsightSeverity};
 
+/// Global execution context carrying user preferences
+#[derive(Debug, Clone)]
+struct RuneContext {
+    verbose: bool,
+    quiet: bool,
+    yes: bool,
+}
+
+impl RuneContext {
+    fn new(args: &Args) -> Self {
+        Self {
+            verbose: args.verbose,
+            quiet: args.quiet,
+            yes: args.yes,
+        }
+    }
+    
+    /// Print message only if not in quiet mode
+    fn info(&self, message: &str) {
+        if !self.quiet {
+            Style::info(message);
+        }
+    }
+    
+    /// Print verbose message only if verbose mode is enabled
+    fn verbose(&self, message: &str) {
+        if self.verbose {
+            Style::verbose(message);
+        }
+    }
+    
+    /// Print warning message (always shown unless quiet)
+    fn warning(&self, message: &str) {
+        if !self.quiet {
+            Style::warning(message);
+        }
+    }
+    
+    /// Print error message (always shown)
+    fn error(&self, message: &str) {
+        Style::error(message);
+    }
+    
+    /// Ask for confirmation unless --yes flag is used
+    fn confirm(&self, prompt: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        if self.yes {
+            return Ok(true);
+        }
+        
+        if self.quiet {
+            // In quiet mode without --yes, default to no for safety
+            return Ok(false);
+        }
+        
+        print!("{} [y/N]: ", prompt);
+        use std::io::{self, Write};
+        io::stdout().flush()?;
+        
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        
+        Ok(input.trim().to_lowercase().starts_with('y'))
+    }
+}
+
 #[derive(Parser, Debug)]
-#[command(name = "rune", version = "0.0.1", about = "Rune — modern DVCS (0.0.1)")]
+#[command(name = "rune", version = "0.0.2", about = "Rune — modern DVCS (0.0.2)")]
 struct Args {
+    /// Enable verbose output with detailed information
+    #[arg(short, long, global = true)]
+    verbose: bool,
+    
+    /// Suppress non-essential output (quiet mode)
+    #[arg(short, long, global = true, conflicts_with = "verbose")]
+    quiet: bool,
+    
+    /// Assume yes for confirmation prompts (non-interactive mode)
+    #[arg(short, long, global = true)]
+    yes: bool,
+    
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -114,6 +191,32 @@ enum Cmd {
     Show {
         #[arg(help = "Commit hash to show", default_value = "HEAD")]
         commit: String,
+    },
+    /// Clone a remote repository
+    Clone {
+        #[arg(help = "Repository URL to clone")]
+        url: String,
+        #[arg(help = "Directory to clone into")]
+        directory: Option<std::path::PathBuf>,
+    },
+    /// Fetch changes from remote repository
+    Fetch {
+        #[arg(help = "Remote name", default_value = "origin")]
+        remote: String,
+    },
+    /// Pull changes from remote repository
+    Pull {
+        #[arg(help = "Remote name", default_value = "origin")]
+        remote: String,
+        #[arg(help = "Branch to pull", default_value = "main")]
+        branch: String,
+    },
+    /// Push changes to remote repository
+    Push {
+        #[arg(help = "Remote name", default_value = "origin")]
+        remote: String,
+        #[arg(help = "Branch to push", default_value = "main")]
+        branch: String,
     },
     /// Create and apply patches
     Patch {
@@ -494,11 +597,258 @@ fn print_version_info() {
     println!("{} Intelligence Engine: ✅", "🧠".blue());
 }
 
+/// Clone a remote repository
+async fn clone_repository(url: &str, directory: Option<&std::path::PathBuf>, ctx: &RuneContext) -> anyhow::Result<()> {
+    ctx.info("📥 Cloning Repository");
+    
+    let target_dir = if let Some(dir) = directory {
+        dir.clone()
+    } else {
+        // Extract repository name from URL
+        let repo_name = url.split('/').last()
+            .unwrap_or("repository")
+            .trim_end_matches(".git");
+        std::path::PathBuf::from(repo_name)
+    };
+    
+    ctx.info(&format!("🔗 Repository: {}", Style::commit_hash(url)));
+    ctx.info(&format!("📁 Target: {}", Style::file_path(&target_dir.display().to_string())));
+    ctx.verbose(&format!("Clone operation starting for: {}", url));
+    
+    // For now, this is a simplified implementation
+    // In a real implementation, this would handle various protocols (HTTP, SSH, file://)
+    if url.starts_with("http://") || url.starts_with("https://") {
+        ctx.info("🌐 HTTP/HTTPS clone detected");
+        ctx.warning("🚧 HTTP/HTTPS cloning not yet implemented");
+        if !ctx.quiet {
+            Style::info("Planned features:");
+            Style::info("  • Git protocol compatibility");
+            Style::info("  • Authentication handling");
+            Style::info("  • Progress tracking");
+            Style::info("  • Shallow clones");
+        }
+    } else if url.starts_with("git@") || url.contains("ssh://") {
+        ctx.info("🔐 SSH clone detected");
+        ctx.warning("🚧 SSH cloning not yet implemented");
+        if !ctx.quiet {
+            Style::info("Planned features:");
+            Style::info("  • SSH key authentication");
+            Style::info("  • Agent support");
+            Style::info("  • Host key verification");
+        }
+    } else if url.starts_with("file://") || std::path::Path::new(url).exists() {
+        ctx.info("📁 Local clone detected");
+        clone_local_repository(url, &target_dir, ctx).await?;
+    } else {
+        ctx.error("❌ Unsupported repository URL format");
+        if !ctx.quiet {
+            Style::info("Supported formats:");
+            Style::info("  • file:///path/to/repo or /path/to/repo (local)");
+            Style::info("  • https://github.com/user/repo.git (planned)");
+            Style::info("  • git@github.com:user/repo.git (planned)");
+        }
+        return Err(anyhow::anyhow!("Unsupported URL format"));
+    }
+    
+    Ok(())
+}
+
+/// Clone a local repository (file:// or local path)
+async fn clone_local_repository(source: &str, target: &std::path::PathBuf, ctx: &RuneContext) -> anyhow::Result<()> {
+    let source_path = if source.starts_with("file://") {
+        std::path::PathBuf::from(&source[7..]) // Remove "file://" prefix
+    } else {
+        std::path::PathBuf::from(source)
+    };
+    
+    // Check if source exists and is a rune repository
+    let source_rune_dir = source_path.join(".rune");
+    if !source_rune_dir.exists() {
+        return Err(anyhow::anyhow!("Source is not a Rune repository"));
+    }
+    
+    // Create target directory
+    std::fs::create_dir_all(target)?;
+    
+    ctx.verbose(&format!("Cloning from {} to {}", source_path.display(), target.display()));
+    
+    // Show progress for repository structure copy
+    Style::progress("Copying repository structure");
+    
+    // Copy .rune directory
+    copy_dir_all(&source_rune_dir, &target.join(".rune"))?;
+    
+    Style::clear_progress();
+    ctx.info("📋 Repository structure copied");
+    
+    // Show progress for working directory copy
+    Style::progress("Copying working directory files");
+    ctx.verbose("Scanning source directory for files to copy");
+    
+    // Copy working directory files (skip .rune)
+    let mut file_count = 0;
+    for entry in std::fs::read_dir(&source_path)? {
+        let entry = entry?;
+        let file_name = entry.file_name();
+        
+        if file_name == ".rune" {
+            continue; // Already copied
+        }
+        
+        let source_item = entry.path();
+        let target_item = target.join(&file_name);
+        
+        file_count += 1;
+        ctx.verbose(&format!("Copying: {}", file_name.to_string_lossy()));
+        
+        if source_item.is_dir() {
+            copy_dir_all(&source_item, &target_item)?;
+        } else {
+            std::fs::copy(&source_item, &target_item)?;
+        }
+    }
+    
+    Style::clear_progress();
+    Style::success("✅ Repository cloned successfully");
+    ctx.info(&format!("📁 Cloned to: {}", Style::file_path(&target.display().to_string())));
+    ctx.verbose(&format!("Copied {} files/directories", file_count));
+    
+    // Verify the clone
+    ctx.verbose("Verifying cloned repository");
+    let store = Store::open(target)?;
+    let log = store.log();
+    if !log.is_empty() {
+        ctx.info(&format!("📊 Commits: {}", log.len()));
+        ctx.info(&format!("🔸 Latest: {}", Style::commit_hash(&log[0].id[..8])));
+    }
+    
+    Ok(())
+}
+
+/// Helper function to recursively copy directories
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> anyhow::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Fetch changes from a remote repository
+async fn fetch_from_remote(remote: &str) -> anyhow::Result<()> {
+    Style::section_header("📥 Fetching from Remote");
+    
+    let s = Store::discover(std::env::current_dir()?)?;
+    
+    println!("\n{} Remote: {}", "🔗".blue(), Style::branch_name(remote));
+    
+    // Check if we're in a repository
+    let _log = s.log(); // This will verify we're in a repo
+    
+    Style::warning("🚧 Remote fetching not yet implemented");
+    Style::info("Planned features:");
+    Style::info("  • Fetch remote refs and objects");
+    Style::info("  • Update remote tracking branches");
+    Style::info("  • Conflict detection and resolution");
+    Style::info("  • Progress reporting for large transfers");
+    Style::info("  • Delta compression optimization");
+    
+    // Simulate fetch operation
+    Style::info("📡 Connecting to remote...");
+    Style::info("🔄 Fetching refs...");
+    Style::info("📦 Downloading objects...");
+    Style::success("✅ Fetch completed (simulated)");
+    
+    Ok(())
+}
+
+/// Pull changes from a remote repository
+async fn pull_from_remote(remote: &str, branch: &str) -> anyhow::Result<()> {
+    Style::section_header("📥 Pulling from Remote");
+    
+    let s = Store::discover(std::env::current_dir()?)?;
+    
+    println!("\n{} Remote: {}", "🔗".blue(), Style::branch_name(remote));
+    println!("{} Branch: {}", "🌿".green(), Style::branch_name(branch));
+    
+    // Check current branch
+    let current_branch = s.head_ref();
+    println!("{} Current: {}", "📍".yellow(), Style::branch_name(&current_branch));
+    
+    Style::warning("🚧 Remote pulling not yet implemented");
+    Style::info("Pull operation would:");
+    Style::info("  1. Fetch changes from remote");
+    Style::info("  2. Merge remote branch into current branch");
+    Style::info("  3. Update working directory");
+    Style::info("  4. Handle merge conflicts if any");
+    
+    // For now, suggest manual workflow
+    Style::info("Manual workflow:");
+    Style::info(&format!("  rune fetch {}", remote));
+    Style::info(&format!("  rune merge {}/{}", remote, branch));
+    
+    Ok(())
+}
+
+/// Push changes to a remote repository
+async fn push_to_remote(remote: &str, branch: &str) -> anyhow::Result<()> {
+    Style::section_header("📤 Pushing to Remote");
+    
+    let s = Store::discover(std::env::current_dir()?)?;
+    
+    println!("\n{} Remote: {}", "🔗".blue(), Style::branch_name(remote));
+    println!("{} Branch: {}", "🌿".green(), Style::branch_name(branch));
+    
+    // Show what would be pushed
+    let log = s.log();
+    if log.is_empty() {
+        Style::warning("⚠️  No commits to push");
+        return Ok(());
+    }
+    
+    println!("{} Latest commit: {}", "📊".blue(), Style::commit_hash(&log[0].id[..8]));
+    println!("{} Total commits: {}", "📈".blue(), log.len());
+    
+    Style::warning("🚧 Remote pushing not yet implemented");
+    Style::info("Push operation would:");
+    Style::info("  1. Compare local and remote refs");
+    Style::info("  2. Upload missing objects and commits");
+    Style::info("  3. Update remote refs");
+    Style::info("  4. Handle push conflicts");
+    
+    // Simulate push validation
+    Style::info("🔍 Validating local commits...");
+    for (i, commit) in log.iter().take(3).enumerate() {
+        println!("  {} {} - {}", 
+                if i == 0 { "📌" } else { "📋" },
+                &commit.id[..8], 
+                commit.message);
+    }
+    if log.len() > 3 {
+        println!("  ... and {} more commits", log.len() - 3);
+    }
+    
+    Style::success("✅ Push validation completed (simulated)");
+    Style::info("Use --dry-run flag to see what would be pushed");
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_colors();
-    let a = Args::parse();
-    match a.cmd {
+    let args = Args::parse();
+    let ctx = RuneContext::new(&args);
+    
+    ctx.verbose("Rune VCS starting with enhanced user experience features");
+    
+    match args.cmd {
         Cmd::Guide => {
             Style::section_header("Rune VCS Quick Start Guide");
             println!("\n{}", "Repository Management:".bold());
@@ -650,8 +1000,13 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Add { paths } => {
             let s = Store::discover(std::env::current_dir()?)?;
             if paths.is_empty() {
-                Style::error("Nothing specified, nothing added.");
-                Style::info("Use 'rune add <pathspec>...' to add files to the staging area");
+                ctx.error("Nothing specified, nothing added.");
+                ctx.info("💡 Tip: Use 'rune add <pathspec>...' to add files to the staging area");
+                ctx.info("Examples:");
+                ctx.info("  rune add .              # Add all files in current directory");
+                ctx.info("  rune add src/           # Add all files in src/ directory");
+                ctx.info("  rune add file.txt       # Add specific file");
+                ctx.info("  rune status             # Show which files can be added");
                 return Ok(());
             }
 
@@ -763,7 +1118,11 @@ async fn main() -> anyhow::Result<()> {
             if let Some(n) = name {
                 // Create new branch
                 if s.branch_exists(&n) {
-                    Style::error(&format!("Branch '{}' already exists", n));
+                    ctx.error(&format!("Branch '{}' already exists", n));
+                    ctx.info("💡 Tip: Use one of these alternatives:");
+                    ctx.info(&format!("  rune checkout {}        # Switch to existing branch", n));
+                    ctx.info("  rune branch              # List all branches");
+                    ctx.info("  rune branch new-name     # Create branch with different name");
                     return Err(anyhow::anyhow!("Branch already exists"));
                 }
                 
@@ -963,19 +1322,27 @@ async fn main() -> anyhow::Result<()> {
             let s = Store::discover(std::env::current_dir()?)?;
             
             if hard {
-                Style::warning("⚠️  WARNING: --hard flag will permanently discard changes in working directory!");
-                eprint!("Are you sure you want to continue? (y/N): ");
-                use std::io::{self, Write};
-                io::stdout().flush().unwrap();
+                ctx.warning("⚠️  WARNING: --hard flag will permanently discard changes in working directory!");
+                ctx.verbose("This operation cannot be undone. All uncommitted changes will be lost.");
                 
-                let mut input = String::new();
-                io::stdin().read_line(&mut input).unwrap();
-                
-                if !input.trim().to_lowercase().starts_with('y') {
-                    Style::info("Reset cancelled.");
-                    return Ok(());
+                match ctx.confirm("Are you sure you want to continue?") {
+                    Ok(true) => {
+                        ctx.verbose("User confirmed destructive operation");
+                    }
+                    Ok(false) => {
+                        ctx.info("Reset cancelled for safety.");
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        ctx.error(&format!("Failed to read user input: {}", e));
+                        return Err(anyhow::anyhow!("Interactive confirmation failed"));
+                    }
                 }
             }
+
+            ctx.verbose(&format!("Performing reset on {} files (hard={})", 
+                if files.is_empty() { "all".to_string() } else { files.len().to_string() }, 
+                hard));
 
             match s.reset(&files, hard) {
                 Ok(()) => {
@@ -1132,6 +1499,22 @@ async fn main() -> anyhow::Result<()> {
 
         Cmd::Version => {
             print_version_info();
+        }
+
+        Cmd::Clone { url, directory } => {
+            clone_repository(&url, directory.as_ref(), &ctx).await?;
+        }
+
+        Cmd::Fetch { remote } => {
+            fetch_from_remote(&remote).await?;
+        }
+
+        Cmd::Pull { remote, branch } => {
+            pull_from_remote(&remote, &branch).await?;
+        }
+
+        Cmd::Push { remote, branch } => {
+            push_to_remote(&remote, &branch).await?;
         }
     }
     Ok(())
