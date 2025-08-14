@@ -9,6 +9,7 @@ members = [
   "crates/rune-remote",
   "crates/rune-pack",
   "crates/rune-delta",
+  "crates/rune-performance",
 ]
 
 [workspace.package]

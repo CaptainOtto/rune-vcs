@@ -7,3 +7,12 @@ license = "Apache-2.0"
 
 [dependencies]
 serde = { workspace = true }
+colored = "2.0"
+blake3 = "1.5"
+serde_json = { workspace = true, optional = true }
+
+[features]
+serde_json = ["dep:serde_json"]
+
+[dev-dependencies]
+serde_json.workspace = true

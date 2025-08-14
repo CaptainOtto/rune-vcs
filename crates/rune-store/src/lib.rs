@@ -27,21 +27,41 @@ pub struct RuneConfig {
     #[serde(default)]
     pub lfs: LfsCfg,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoreCfg {
     #[serde(default = "def_branch")]
     pub default_branch: String,
 }
+
+impl Default for CoreCfg {
+    fn default() -> Self {
+        Self {
+            default_branch: def_branch(),
+        }
+    }
+}
+
 fn def_branch() -> String {
     "main".into()
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LfsCfg {
     #[serde(default = "def_chunk")]
     pub chunk_size: usize,
     pub remote: Option<String>,
     #[serde(default)]
     pub track: Vec<TrackCfg>,
+}
+
+impl Default for LfsCfg {
+    fn default() -> Self {
+        Self {
+            chunk_size: def_chunk(),
+            remote: None,
+            track: Vec::new(),
+        }
+    }
 }
 fn def_chunk() -> usize {
     8 * 1024 * 1024
@@ -106,6 +126,7 @@ impl Store {
         fs::read_to_string(self.rune_dir.join(r))
             .ok()
             .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty()) // Filter out empty strings
     }
     pub fn write_ref(&self, r: &str, id: &str) -> Result<()> {
         let p = self.rune_dir.join(r);
@@ -216,5 +237,286 @@ impl Store {
         }
         
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use std::fs;
+
+    fn create_initialized_store() -> (TempDir, Store) {
+        let temp_dir = TempDir::new().unwrap();
+        let store = Store::open(temp_dir.path()).unwrap();
+        store.create().unwrap();
+        (temp_dir, store)
+    }
+
+    #[test]
+    fn test_store_open() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = Store::open(temp_dir.path()).unwrap();
+        
+        assert_eq!(store.root, temp_dir.path());
+        assert_eq!(store.rune_dir, temp_dir.path().join(".rune"));
+    }
+
+    #[test]
+    fn test_store_discover() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        // Create subdirectory and test discovery
+        let subdir = store.root.join("subdir");
+        fs::create_dir_all(&subdir).unwrap();
+        
+        let discovered = Store::discover(&subdir).unwrap();
+        assert_eq!(discovered.root, store.root);
+    }
+
+    #[test]
+    fn test_store_discover_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = Store::discover(temp_dir.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_store_create() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = Store::open(temp_dir.path()).unwrap();
+        
+        store.create().unwrap();
+        
+        // Verify directory structure
+        assert!(store.rune_dir.join("objects").exists());
+        assert!(store.rune_dir.join("refs/heads").exists());
+        assert!(store.rune_dir.join("HEAD").exists());
+        assert!(store.rune_dir.join("index.json").exists());
+        assert!(store.rune_dir.join("refs/heads/main").exists());
+    }
+
+    #[test]
+    fn test_config_operations() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        // Test default config
+        let config = store.config();
+        assert_eq!(config.core.default_branch, "main");
+        assert_eq!(config.lfs.chunk_size, 8 * 1024 * 1024);
+        
+        // Test writing and reading config
+        let new_config = RuneConfig {
+            core: CoreCfg {
+                default_branch: "develop".to_string(),
+            },
+            lfs: LfsCfg {
+                chunk_size: 1024,
+                remote: None,
+                track: vec![],
+            },
+        };
+        
+        store.write_config(&new_config).unwrap();
+        let read_config = store.config();
+        
+        assert_eq!(read_config.core.default_branch, "develop");
+        assert_eq!(read_config.lfs.chunk_size, 1024);
+    }
+
+    #[test]
+    fn test_head_ref_operations() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        // Test default head ref
+        let head_ref = store.head_ref();
+        assert_eq!(head_ref, "refs/heads/main");
+        
+        // Test setting new head ref
+        store.set_head("refs/heads/feature").unwrap();
+        let new_head_ref = store.head_ref();
+        assert_eq!(new_head_ref, "refs/heads/feature");
+    }
+
+    #[test]
+    fn test_ref_operations() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        let ref_name = "refs/heads/test";
+        let commit_id = "abc123def456";
+        
+        // Test writing and reading ref
+        store.write_ref(ref_name, commit_id).unwrap();
+        let read_id = store.read_ref(ref_name).unwrap();
+        
+        assert_eq!(read_id, commit_id);
+        
+        // Test reading non-existent ref
+        let non_existent = store.read_ref("refs/heads/nonexistent");
+        assert!(non_existent.is_none());
+    }
+
+    #[test]
+    fn test_index_operations() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        // Test default empty index
+        let index = store.read_index().unwrap();
+        assert!(index.entries.is_empty());
+        
+        // Test writing and reading index
+        let mut new_index = Index::default();
+        new_index.entries.insert("file1.txt".to_string(), 1234567890);
+        new_index.entries.insert("file2.txt".to_string(), 1234567891);
+        
+        store.write_index(&new_index).unwrap();
+        let read_index = store.read_index().unwrap();
+        
+        assert_eq!(read_index.entries.len(), 2);
+        assert_eq!(read_index.entries.get("file1.txt"), Some(&1234567890));
+        assert_eq!(read_index.entries.get("file2.txt"), Some(&1234567891));
+    }
+
+    #[test]
+    fn test_stage_file() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        // Create a test file
+        let test_file = "test.txt";
+        let test_content = "Hello, World!";
+        fs::write(store.root.join(test_file), test_content).unwrap();
+        
+        // Stage the file
+        store.stage_file(test_file).unwrap();
+        
+        // Verify file was staged
+        let index = store.read_index().unwrap();
+        assert!(index.entries.contains_key(test_file));
+    }
+
+    #[test]
+    fn test_stage_nonexistent_file() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        let result = store.stage_file("nonexistent.txt");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_commit() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        // Create and stage a test file
+        let test_file = "test.txt";
+        let test_content = "Hello, World!";
+        fs::write(store.root.join(test_file), test_content).unwrap();
+        store.stage_file(test_file).unwrap();
+        
+        // Create commit
+        let author = Author {
+            name: "Test User".to_string(),
+            email: "test@example.com".to_string(),
+        };
+        
+        let commit = store.commit("Initial commit", author.clone()).unwrap();
+        
+        assert_eq!(commit.message, "Initial commit");
+        assert_eq!(commit.author.name, "Test User");
+        assert_eq!(commit.author.email, "test@example.com");
+        assert_eq!(commit.files, vec![test_file.to_string()]);
+        assert!(commit.parent.is_none()); // First commit has no parent
+        
+        // Verify commit was logged
+        let log = store.log();
+        assert_eq!(log.len(), 1);
+        assert_eq!(log[0].id, commit.id);
+    }
+
+    #[test]
+    fn test_commit_nothing_staged() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        let author = Author {
+            name: "Test User".to_string(),
+            email: "test@example.com".to_string(),
+        };
+        
+        let result = store.commit("Empty commit", author);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("nothing to commit"));
+    }
+
+    #[test]
+    fn test_multiple_commits() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        let author = Author {
+            name: "Test User".to_string(),
+            email: "test@example.com".to_string(),
+        };
+        
+        // First commit
+        fs::write(store.root.join("file1.txt"), "Content 1").unwrap();
+        store.stage_file("file1.txt").unwrap();
+        let commit1 = store.commit("First commit", author.clone()).unwrap();
+        
+        // Second commit
+        fs::write(store.root.join("file2.txt"), "Content 2").unwrap();
+        store.stage_file("file2.txt").unwrap();
+        let commit2 = store.commit("Second commit", author).unwrap();
+        
+        // Verify commit history
+        let log = store.log();
+        assert_eq!(log.len(), 2);
+        
+        // Find commits in log (order may vary)
+        let commit1_in_log = log.iter().find(|c| c.id == commit1.id).unwrap();
+        let commit2_in_log = log.iter().find(|c| c.id == commit2.id).unwrap();
+        
+        assert_eq!(commit2_in_log.parent, Some(commit1.id.clone()));
+        assert!(commit1_in_log.parent.is_none());
+    }
+
+    #[test]
+    fn test_empty_log() {
+        let (_temp_dir, store) = create_initialized_store();
+        
+        let log = store.log();
+        assert!(log.is_empty());
+    }
+
+    #[test]
+    fn test_track_config() {
+        let track_cfg = TrackCfg {
+            pattern: "*.large".to_string(),
+        };
+        
+        assert_eq!(track_cfg.pattern, "*.large");
+    }
+
+    #[test]
+    fn test_index_ordering() {
+        let mut index = Index::default();
+        index.entries.insert("z_file.txt".to_string(), 1);
+        index.entries.insert("a_file.txt".to_string(), 2);
+        index.entries.insert("m_file.txt".to_string(), 3);
+        
+        // BTreeMap should maintain ordering
+        let keys: Vec<_> = index.entries.keys().collect();
+        assert_eq!(keys, vec!["a_file.txt", "m_file.txt", "z_file.txt"]);
+    }
+
+    #[test]
+    fn test_core_config_defaults() {
+        let core_cfg = CoreCfg::default();
+        assert_eq!(core_cfg.default_branch, "main");
+    }
+
+    #[test]
+    fn test_lfs_config_defaults() {
+        let lfs_cfg = LfsCfg::default();
+        assert_eq!(lfs_cfg.chunk_size, 8 * 1024 * 1024);
+        assert!(lfs_cfg.remote.is_none());
+        assert!(lfs_cfg.track.is_empty());
     }
 }

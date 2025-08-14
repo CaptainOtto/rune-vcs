@@ -3,6 +3,7 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use std::{fs, path::{Path,PathBuf}};
 
+// LFS functionality
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LfsConfig { pub patterns: Vec<String>, pub chunk_size: usize, pub remote: Option<String> }
 
@@ -38,3 +39,6 @@ size {}", oid, data.len()))?;
     for cid in ptr.chunks { let part = fs::read(dir.join(cid))?; out.extend_from_slice(&part); } fs::write(self.root.join(rel), out)?; Ok(true)
   }
 }
+
+// Locking functionality moved from rune-cli
+pub mod locking;

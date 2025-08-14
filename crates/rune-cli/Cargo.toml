@@ -19,6 +19,7 @@ rune-core = { path = "../rune-core" }
 rune-store = { path = "../rune-store" }
 rune-lfs = { path = "../rune-lfs" }
 rune-remote = { path = "../rune-remote" }
+rune-performance = { path = "../rune-performance" }
 axum = { workspace = true }
 
 rune-delta = { path = "../rune-delta" }
@@ -28,3 +29,14 @@ whoami = "1.4"
 serde_yaml = "0.9"
 colored = "2.1"
 console = "0.15"
+
+[dev-dependencies]
+tempfile = "3.8"
+
+[[test]]
+name = "cli_integration_tests"
+path = "../../tests/cli_integration_tests.rs"
+
+[[test]]
+name = "integration_tests"
+path = "../../tests/integration_tests.rs"

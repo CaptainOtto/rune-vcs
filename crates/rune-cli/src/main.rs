@@ -7,10 +7,8 @@ pub mod commands;
 mod style;
 use colored::*;
 use style::{init_colors, Style};
-mod intelligence;
-mod performance;
-mod locking;
-use performance::PerformanceEngine;
+use rune_performance::PerformanceEngine;
+use rune_core::intelligence::{IntelligentFileAnalyzer, InsightSeverity};
 
 #[derive(Parser, Debug)]
 #[command(name = "rune", version = "0.0.1", about = "Rune — modern DVCS (0.0.1)")]
@@ -126,9 +124,6 @@ enum Cmd {
         #[command(subcommand)]
         cmd: ConfigCmd,
     },
-    /// Enable intelligent file locking and conflict prevention
-    #[command(subcommand)]
-    Lock(crate::locking::LockCmd),
 }
 
 #[derive(Subcommand, Debug)]
@@ -221,7 +216,7 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
                     std::env::var("RUNE_INTELLIGENCE_NOTIFICATIONS").unwrap_or("(not set)".to_string()).yellow());
         },
         ConfigCmd::Intelligence => {
-            let mut analyzer = intelligence::IntelligentFileAnalyzer::new();
+            let mut analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Intelligence Configuration");
             
             println!("\n{}", "Current Settings:".bold());
@@ -255,7 +250,7 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
                     if let Ok(analysis) = analyzer.analyze_file(&sample_file) {
                         println!("  File: {}", Style::file_path(&sample_file));
                         println!("  Type: {:?}", analysis.file_type);
-                        println!("  Security Risk: {:?}", analysis.security_risk.level);
+                        println!("  Security Issues: {}", analysis.security_issues.len());
                         if !analysis.suggestions.is_empty() {
                             println!("  Suggestions: {} available", analysis.suggestions.len());
                         }
@@ -296,51 +291,51 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
             Style::info("Use environment variables for persistent settings");
         },
         ConfigCmd::Health => {
-            let mut analyzer = intelligence::IntelligentFileAnalyzer::new();
+            let mut analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Repository Health Analysis");
             
             match std::env::current_dir() {
                 Ok(current_dir) => {
                     let repo_path = current_dir.to_string_lossy();
-                    match analyzer.analyze_repository_health(&repo_path) {
-                        Ok(health) => {
-                            println!("\n{}", "Overall Health Score".bold());
-                            println!("  🎯 Overall: {:.1}/100 {}", 
-                                    health.overall_score,
-                                    if health.overall_score > 80.0 { "🟢".green() } 
-                                    else if health.overall_score > 60.0 { "🟡".yellow() } 
-                                    else { "🔴".red() });
-                            
-                            println!("\n{}", "Detailed Scores".bold());
-                            println!("  🔐 Security: {:.1}/100", health.security_score);
-                            println!("  ⚡ Performance: {:.1}/100", health.performance_score);
-                            println!("  📊 Quality: {:.1}/100", health.quality_score);
-                            println!("  📁 Organization: {:.1}/100", health.organization_score);
-                            
-                            println!("\n{}", "Repository Statistics".bold());
-                            println!("  📄 Total files analyzed: {}", health.total_files);
-                            println!("  ⚠️  Files with security risks: {}", health.risk_files);
-                            println!("  📦 Large files (LFS candidates): {}", health.large_files);
-                            
-                            if health.overall_score < 70.0 {
-                                println!("\n{}", "Recommendations".bold());
-                                println!("  Run 'rune config insights' for specific improvement suggestions");
-                            }
-                        },
-                        Err(e) => Style::error(&format!("Failed to analyze repository health: {}", e)),
+                    let health = analyzer.analyze_repository_health(&repo_path);
+                    
+                    println!("\n{}", "Repository Health Report".bold());
+                    println!("  🎯 Overall Score: {:.1}/100 {}", 
+                            health.overall_score,
+                            if health.overall_score > 80.0 { "🟢".green() } 
+                            else if health.overall_score > 60.0 { "🟡".yellow() } 
+                            else { "🔴".red() });
+                    
+                    if !health.issues.is_empty() {
+                        println!("\n{}", "Issues Found".bold());
+                        for issue in &health.issues {
+                            println!("  ⚠️  {}", issue);
+                        }
+                    }
+                    
+                    if !health.recommendations.is_empty() {
+                        println!("\n{}", "Recommendations".bold());
+                        for rec in &health.recommendations {
+                            println!("  💡 {}", rec);
+                        }
+                    }
+                    
+                    if health.overall_score < 70.0 {
+                        println!("\n{}", "Tip".bold());
+                        println!("  Run 'rune config insights' for more specific improvement suggestions");
                     }
                 },
                 Err(e) => Style::error(&format!("Failed to get current directory: {}", e)),
             }
         },
         ConfigCmd::Insights => {
-            let analyzer = intelligence::IntelligentFileAnalyzer::new();
+            let analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Predictive Repository Insights");
             
             match std::env::current_dir() {
                 Ok(current_dir) => {
                     let repo_path = current_dir.to_string_lossy();
-                    let insights = analyzer.predict_issues(&repo_path);
+                    let insights = analyzer.generate_insights(&repo_path);
                     
                     if insights.is_empty() {
                         println!("\n🎉 {} No potential issues detected!", "Excellent!".green().bold());
@@ -350,17 +345,13 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
                         
                         for (i, insight) in insights.iter().enumerate() {
                             let severity_icon = match insight.severity {
-                                intelligence::InsightSeverity::Critical => "🚨",
-                                intelligence::InsightSeverity::High => "⚠️",
-                                intelligence::InsightSeverity::Medium => "⚡",
-                                intelligence::InsightSeverity::Low => "💡",
+                                InsightSeverity::High => "⚠️",
+                                InsightSeverity::Medium => "⚡",
                             };
                             
                             println!("\n{}. {} {} (Confidence: {:.0}%)",
-                                    i + 1, severity_icon, insight.title.bold(), insight.confidence * 100.0);
+                                    i + 1, severity_icon, insight.insight.bold(), insight.confidence * 100.0);
                             println!("   Category: {:?}", insight.category);
-                            println!("   Issue: {}", insight.description);
-                            println!("   Recommendation: {}", insight.recommendation.cyan());
                         }
                         
                         println!("\n{}", "Next Steps".bold());
@@ -537,7 +528,7 @@ async fn main() -> anyhow::Result<()> {
             }
 
             // Revolutionary intelligence and performance systems
-            let mut analyzer = intelligence::IntelligentFileAnalyzer::new();
+            let mut analyzer = IntelligentFileAnalyzer::new();
             let engine = PerformanceEngine::new();
             let mut added_count = 0;
 
@@ -780,10 +771,6 @@ async fn main() -> anyhow::Result<()> {
         
         Cmd::Config { cmd } => {
             handle_config_command(cmd)?;
-        }
-        
-        Cmd::Lock(cmd) => {
-            locking::handle_lock_command(cmd)?;
         }
 
         Cmd::Diff { target } => {
