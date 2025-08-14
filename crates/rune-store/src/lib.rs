@@ -137,6 +137,43 @@ impl Store {
         Ok(())
     }
 
+    /// Create a new branch pointing to the current HEAD
+    pub fn create_branch(&self, name: &str) -> Result<()> {
+        let current_head = self.head_ref();
+        let current_commit_id = self.read_ref(&current_head)
+            .ok_or_else(|| anyhow::anyhow!("Current branch has no commits"))?;
+        
+        let branch_ref = format!("refs/heads/{}", name);
+        self.write_ref(&branch_ref, &current_commit_id)?;
+        Ok(())
+    }
+
+    /// List all branches
+    pub fn list_branches(&self) -> Result<Vec<String>> {
+        let mut branches = Vec::new();
+        let heads_dir = self.rune_dir.join("refs/heads");
+        
+        if heads_dir.exists() {
+            for entry in walkdir::WalkDir::new(&heads_dir) {
+                let entry = entry?;
+                if entry.file_type().is_file() {
+                    // Get the relative path from refs/heads/ to get the full branch name
+                    if let Ok(relative_path) = entry.path().strip_prefix(&heads_dir) {
+                        branches.push(relative_path.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+        
+        Ok(branches)
+    }
+
+    /// Check if a branch exists
+    pub fn branch_exists(&self, name: &str) -> bool {
+        let branch_ref = format!("refs/heads/{}", name);
+        self.read_ref(&branch_ref).is_some()
+    }
+
     pub fn read_index(&self) -> Result<Index> {
         let p = self.rune_dir.join("index.json");
         if p.exists() {

@@ -1,6 +1,4 @@
 use rune_performance::*;
-use std::fs;
-use tempfile::TempDir;
 
 #[cfg(test)]
 mod performance_tests {

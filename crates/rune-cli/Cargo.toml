@@ -32,6 +32,8 @@ console = "0.15"
 
 [dev-dependencies]
 tempfile = "3.8"
+rune-core = { path = "../rune-core" }
+rune-store = { path = "../rune-store" }
 
 [[test]]
 name = "cli_integration_tests"

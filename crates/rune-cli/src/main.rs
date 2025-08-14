@@ -291,7 +291,7 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
             Style::info("Use environment variables for persistent settings");
         },
         ConfigCmd::Health => {
-            let mut analyzer = IntelligentFileAnalyzer::new();
+            let analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Repository Health Analysis");
             
             match std::env::current_dir() {
@@ -563,7 +563,10 @@ async fn main() -> anyhow::Result<()> {
                             println!("add {}", Style::file_path(&rel));
                         }
                     }
-                    Err(e) => Style::error(&format!("Failed to add {}: {}", rel, e)),
+                    Err(e) => {
+                        Style::error(&format!("Failed to add {}: {}", rel, e));
+                        return Err(anyhow::anyhow!("Failed to add {}: {}", rel, e));
+                    }
                 }
             }
 
@@ -631,32 +634,27 @@ async fn main() -> anyhow::Result<()> {
 
             if let Some(n) = name {
                 // Create new branch
-                std::fs::create_dir_all(s.rune_dir.join("refs/heads"))?;
-                std::fs::write(s.rune_dir.join("refs/heads").join(&n), b"")?;
+                if s.branch_exists(&n) {
+                    Style::error(&format!("Branch '{}' already exists", n));
+                    return Err(anyhow::anyhow!("Branch already exists"));
+                }
+                
+                s.create_branch(&n)?;
                 Style::success(&format!("Created branch {}", Style::branch_name(&n)));
             } else {
                 // List branches
                 let current_branch = s.head_ref();
-                let mut branches = Vec::new();
-
-                if let Ok(entries) = walkdir::WalkDir::new(s.rune_dir.join("refs/heads"))
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()
-                {
-                    for e in entries {
-                        if e.file_type().is_file() {
-                            if let Some(branch_name) = e.path().file_name() {
-                                branches.push(branch_name.to_string_lossy().to_string());
-                            }
-                        }
-                    }
-                }
+                let current_branch_name = current_branch
+                    .strip_prefix("refs/heads/")
+                    .unwrap_or(&current_branch);
+                
+                let branches = s.list_branches()?;
 
                 if fmt == "json" {
                     println!(
                         "{}",
                         serde_json::json!({
-                          "current": current_branch,
+                          "current": current_branch_name,
                           "branches": branches
                         })
                     );
@@ -664,16 +662,17 @@ async fn main() -> anyhow::Result<()> {
                     println!(
                         "{}",
                         serde_yaml::to_string(&serde_json::json!({
-                          "current": current_branch,
+                          "current": current_branch_name,
                           "branches": branches
                         }))?
                     );
                 } else {
                     if branches.is_empty() {
                         Style::info("No branches found");
+                        Style::info(&format!("Current: {}", Style::branch_name(current_branch_name)));
                     } else {
                         for branch in branches {
-                            if branch == current_branch {
+                            if branch == current_branch_name {
                                 println!("* {}", Style::branch_name(&branch));
                             } else {
                                 println!("  {}", branch);
