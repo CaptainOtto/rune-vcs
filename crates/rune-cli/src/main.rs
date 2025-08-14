@@ -8,10 +8,11 @@ mod style;
 use colored::*;
 use style::{init_colors, Style};
 use rune_performance::PerformanceEngine;
-use rune_core::intelligence::{IntelligentFileAnalyzer, InsightSeverity};
 use rune_core::ignore::{IgnoreEngine, IgnoreRule, RuleType};
 use rune_docs::DocsEngine;
 use anyhow::Context;
+pub mod intelligence;
+use intelligence::{IntelligentFileAnalyzer, InsightSeverity};
 
 /// Global execution context carrying user preferences
 #[derive(Debug, Clone)]
@@ -228,6 +229,46 @@ enum TutorialCmd {
 }
 
 #[derive(Subcommand, Debug)]
+enum IntelligenceCmd {
+    /// Analyze repository for insights and recommendations
+    Analyze {
+        #[arg(help = "Repository path to analyze", default_value = ".")]
+        path: Option<String>,
+        #[arg(long, help = "Show detailed analysis report")]
+        detailed: bool,
+    },
+    /// Generate predictive insights and recommendations
+    Predict {
+        #[arg(help = "Repository path to analyze", default_value = ".")]
+        path: Option<String>,
+    },
+    /// Analyze a specific file
+    File {
+        #[arg(help = "File path to analyze")]
+        path: String,
+    },
+    /// Configure intelligence engine settings
+    Config {
+        #[arg(long, help = "Enable or disable intelligence engine")]
+        enable: Option<bool>,
+        #[arg(long, help = "Set LFS threshold in MB")]
+        lfs_threshold: Option<u64>,
+        #[arg(long, help = "Enable security analysis")]
+        security: Option<bool>,
+        #[arg(long, help = "Enable performance insights")]
+        performance: Option<bool>,
+        #[arg(long, help = "Enable predictive modeling")]
+        predictive: Option<bool>,
+        #[arg(long, help = "Enable repository health monitoring")]
+        health: Option<bool>,
+        #[arg(long, help = "Enable code quality assessment")]
+        quality: Option<bool>,
+    },
+    /// Show intelligence engine status
+    Status,
+}
+
+#[derive(Subcommand, Debug)]
 enum Cmd {
     /// Run local JSON API server
     Api {
@@ -366,6 +407,11 @@ enum Cmd {
     Shrine(commands::shrine::ShrineCmd),
     #[command(subcommand)]
     Delta(commands::delta::DeltaCmd),
+    /// Intelligent repository analysis and insights
+    Intelligence {
+        #[command(subcommand)]
+        cmd: IntelligenceCmd,
+    },
     /// Configure Rune intelligence and features
     Config {
         #[command(subcommand)]
@@ -547,62 +593,69 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
             Style::info("Use environment variables for persistent settings");
         },
         ConfigCmd::Health => {
-            let analyzer = IntelligentFileAnalyzer::new();
+            let mut analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Repository Health Analysis");
             
             match std::env::current_dir() {
                 Ok(current_dir) => {
-                    let repo_path = current_dir.to_string_lossy();
-                    let health = analyzer.analyze_repository_health(&repo_path);
+                    let insights = analyzer.analyze_repository(&current_dir)?;
                     
                     println!("\n{}", "Repository Health Report".bold());
                     println!("  🎯 Overall Score: {:.1}/100 {}", 
-                            health.overall_score,
-                            if health.overall_score > 80.0 { "🟢".green() } 
-                            else if health.overall_score > 60.0 { "🟡".yellow() } 
+                            insights.quality_score,
+                            if insights.quality_score > 80.0 { "🟢".green() } 
+                            else if insights.quality_score > 60.0 { "🟡".yellow() } 
                             else { "🔴".red() });
                     
-                    if !health.issues.is_empty() {
-                        println!("\n{}", "Issues Found".bold());
-                        for issue in &health.issues {
-                            println!("  ⚠️  {}", issue);
+                    if !insights.health_indicators.is_empty() {
+                        println!("\n{}", "Health Indicators".bold());
+                        for indicator in &insights.health_indicators {
+                            println!("  {} {}: {}", 
+                                match indicator.status {
+                                    crate::intelligence::HealthStatus::Excellent => "✅",
+                                    crate::intelligence::HealthStatus::Good => "🟢", 
+                                    crate::intelligence::HealthStatus::Warning => "⚠️",
+                                    crate::intelligence::HealthStatus::Critical => "🔴",
+                                },
+                                indicator.indicator,
+                                indicator.description
+                            );
                         }
                     }
                     
-                    if !health.recommendations.is_empty() {
-                        println!("\n{}", "Recommendations".bold());
-                        for rec in &health.recommendations {
-                            println!("  💡 {}", rec);
+                    if !insights.optimization_suggestions.is_empty() {
+                        println!("\n{}", "Optimization Suggestions".bold());
+                        for suggestion in insights.optimization_suggestions.iter().take(3) {
+                            println!("  💡 [Impact: {:.1}] {}", suggestion.impact_score, suggestion.suggestion);
                         }
                     }
                     
-                    if health.overall_score < 70.0 {
+                    if insights.quality_score < 70.0 {
                         println!("\n{}", "Tip".bold());
-                        println!("  Run 'rune config insights' for more specific improvement suggestions");
+                        println!("  Run 'rune intelligence predict' for more specific improvement suggestions");
                     }
                 },
                 Err(e) => Style::error(&format!("Failed to get current directory: {}", e)),
             }
         },
         ConfigCmd::Insights => {
-            let analyzer = IntelligentFileAnalyzer::new();
+            let mut analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Predictive Repository Insights");
             
             match std::env::current_dir() {
                 Ok(current_dir) => {
-                    let repo_path = current_dir.to_string_lossy();
-                    let insights = analyzer.generate_insights(&repo_path);
+                    let predictions = analyzer.generate_predictive_insights(&current_dir);
                     
-                    if insights.is_empty() {
+                    if predictions.is_empty() {
                         println!("\n🎉 {} No potential issues detected!", "Excellent!".green().bold());
                         println!("Your repository appears to be well-maintained.");
                     } else {
-                        println!("\n{} {} insights found:", "🔮".blue(), insights.len());
+                        println!("\n{} {} insights found:", "🔮".blue(), predictions.len());
                         
-                        for (i, insight) in insights.iter().enumerate() {
+                        for (i, insight) in predictions.iter().enumerate() {
                             let severity_icon = match insight.severity {
-                                InsightSeverity::High => "⚠️",
-                                InsightSeverity::Medium => "⚡",
+                                crate::intelligence::InsightSeverity::High => "⚠️",
+                                crate::intelligence::InsightSeverity::Medium => "⚡",
                             };
                             
                             println!("\n{}. {} {} (Confidence: {:.0}%)",
@@ -1794,6 +1847,41 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Cmd::Lfs(sub) => return commands::lfs::run(sub).await,
+        Cmd::Intelligence { cmd } => {
+            match cmd {
+                IntelligenceCmd::Analyze { path, detailed } => {
+                    return commands::intelligence::analyze_repository(path, detailed).map_err(|e| e.into());
+                }
+                IntelligenceCmd::Predict { path } => {
+                    return commands::intelligence::generate_predictions(path).map_err(|e| e.into());
+                }
+                IntelligenceCmd::File { path } => {
+                    return commands::intelligence::analyze_file(path).map_err(|e| e.into());
+                }
+                IntelligenceCmd::Config { 
+                    enable,
+                    lfs_threshold,
+                    security,
+                    performance,
+                    predictive,
+                    health,
+                    quality,
+                } => {
+                    return commands::intelligence::configure_intelligence(
+                        enable,
+                        lfs_threshold,
+                        security,
+                        performance,
+                        predictive,
+                        health,
+                        quality,
+                    ).map_err(|e| e.into());
+                }
+                IntelligenceCmd::Status => {
+                    return commands::intelligence::show_intelligence_status().map_err(|e| e.into());
+                }
+            }
+        }
         Cmd::Shrine(sub) => match sub {
             commands::shrine::ShrineCmd::Serve { addr } => {
                 return commands::shrine::serve(addr).await
