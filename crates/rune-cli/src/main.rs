@@ -9,6 +9,8 @@ use colored::*;
 use style::{init_colors, Style};
 use rune_performance::PerformanceEngine;
 use rune_core::intelligence::{IntelligentFileAnalyzer, InsightSeverity};
+use rune_core::ignore::{IgnoreEngine, IgnoreRule, RuleType};
+use anyhow::Context;
 
 /// Global execution context carrying user preferences
 #[derive(Debug, Clone)]
@@ -107,6 +109,54 @@ enum PatchCmd {
     Apply {
         #[arg(help = "Patch file to apply")]
         patch: std::path::PathBuf,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum IgnoreCmd {
+    /// Check if a file would be ignored
+    Check {
+        #[arg(help = "Files to check")]
+        files: Vec<std::path::PathBuf>,
+        #[arg(long, help = "Show detailed debug information")]
+        debug: bool,
+    },
+    /// Add pattern to ignore file
+    Add {
+        #[arg(help = "Pattern to add")]
+        pattern: String,
+        #[arg(long, help = "Description for the rule")]
+        description: Option<String>,
+        #[arg(long, help = "Priority level (higher takes precedence)", default_value = "50")]
+        priority: i32,
+        #[arg(long, help = "Add to global ignore file")]
+        global: bool,
+    },
+    /// List current ignore rules
+    List {
+        #[arg(long, help = "Show global rules")]
+        global: bool,
+        #[arg(long, help = "Show project rules")]
+        project: bool,
+        #[arg(long, help = "Show active templates")]
+        templates: bool,
+    },
+    /// Show active project templates
+    Templates,
+    /// Apply a project template
+    Apply {
+        #[arg(help = "Template name to apply")]
+        template: String,
+    },
+    /// Initialize smart ignore configuration
+    Init {
+        #[arg(long, help = "Force overwrite existing configuration")]
+        force: bool,
+    },
+    /// Clean up and optimize ignore rules
+    Optimize {
+        #[arg(long, help = "Show what would be optimized without doing it")]
+        dry_run: bool,
     },
 }
 
@@ -217,6 +267,11 @@ enum Cmd {
         remote: String,
         #[arg(help = "Branch to push", default_value = "main")]
         branch: String,
+    },
+    /// Manage ignore patterns with advanced features
+    Ignore {
+        #[command(subcommand)]
+        cmd: IgnoreCmd,
     },
     /// Create and apply patches
     Patch {
@@ -836,6 +891,166 @@ async fn push_to_remote(remote: &str, branch: &str) -> anyhow::Result<()> {
     
     Style::success("✅ Push validation completed (simulated)");
     Style::info("Use --dry-run flag to see what would be pushed");
+    
+    Ok(())
+}
+
+/// Handle ignore-related commands with advanced features
+async fn handle_ignore_command(cmd: IgnoreCmd, ctx: &RuneContext) -> anyhow::Result<()> {
+    match cmd {
+        IgnoreCmd::Check { files, debug } => {
+            ctx.info("🔍 Checking ignore status");
+            
+            let mut engine = IgnoreEngine::new(std::env::current_dir().context("Failed to get current directory")?).context("Failed to initialize ignore engine")?;
+            
+            for file in &files {
+                let should_ignore = engine.should_ignore(file);
+                let status = if should_ignore { "❌ IGNORED" } else { "✅ TRACKED" };
+                
+                if debug {
+                    let debug_info = engine.debug_path(file);
+                    println!("\n{} {}: {}", 
+                        "📁".blue(), 
+                        Style::file_path(&file.display().to_string()), 
+                        status);
+                    
+                    if !debug_info.matched_rules.is_empty() {
+                        println!("  📋 Matched Rules:");
+                        for rule_match in &debug_info.matched_rules {
+                            println!("    {} {} (priority: {}) - {}", 
+                                "🔸".yellow(),
+                                rule_match.rule.pattern,
+                                rule_match.rule.priority,
+                                rule_match.rule.description.as_deref().unwrap_or("No description"));
+                        }
+                    }
+                    
+                    if let Some(decision_rule) = &debug_info.decision_rule {
+                        println!("  🎯 Final Decision: {} - {}", 
+                            decision_rule.rule.pattern,
+                            decision_rule.rule.description.as_deref().unwrap_or("No description"));
+                    }
+                } else {
+                    println!("{} {}: {}", 
+                        "📁".blue(), 
+                        Style::file_path(&file.display().to_string()), 
+                        status);
+                }
+            }
+        }
+        
+        IgnoreCmd::Add { pattern, description, priority, global } => {
+            ctx.info(&format!("➕ Adding ignore pattern: {}", pattern));
+            
+            let mut engine = IgnoreEngine::new(std::env::current_dir().context("Failed to get current directory")?)?;
+            
+            let rule = IgnoreRule {
+                pattern: pattern.clone(),
+                rule_type: RuleType::Ignore,
+                priority,
+                description,
+                condition: None,
+            };
+            
+            engine.add_rule(rule);
+            engine.save_config()?;
+            
+            let scope = if global { "global" } else { "project" };
+            Style::success(&format!("✅ Added ignore pattern '{}' to {} configuration", pattern, scope));
+        }
+        
+        IgnoreCmd::List { global, project, templates } => {
+            let engine = IgnoreEngine::new(std::env::current_dir().context("Failed to get current directory")?)?;
+            
+            if global || (!project && !templates) {
+                ctx.info("🌍 Global Ignore Rules:");
+                for rule in engine.get_global_rules() {
+                    println!("  {} {} (priority: {}) - {}", 
+                        "🔸".yellow(),
+                        rule.pattern,
+                        rule.priority,
+                        rule.description.as_deref().unwrap_or("No description"));
+                }
+                println!();
+            }
+            
+            if project || (!global && !templates) {
+                ctx.info("📁 Project Ignore Rules:");
+                for rule in engine.get_project_rules() {
+                    println!("  {} {} (priority: {}) - {}", 
+                        "🔸".blue(),
+                        rule.pattern,
+                        rule.priority,
+                        rule.description.as_deref().unwrap_or("No description"));
+                }
+                println!();
+            }
+            
+            if templates || (!global && !project) {
+                ctx.info("📋 Active Templates:");
+                for template in engine.get_active_templates() {
+                    println!("  {} {}", "✅".green(), template);
+                }
+            }
+        }
+        
+        IgnoreCmd::Templates => {
+            ctx.info("📋 Available Project Templates:");
+            
+            let templates = vec![
+                ("rust", "Rust projects (Cargo.toml, target/, *.rs)"),
+                ("node", "Node.js projects (package.json, node_modules/, npm logs)"),
+                ("python", "Python projects (setup.py, __pycache__/, *.pyc)"),
+                ("java", "Java projects (pom.xml, build.gradle, target/, *.class)"),
+                ("dotnet", ".NET projects (*.csproj, bin/, obj/, *.suo)"),
+            ];
+            
+            for (name, description) in templates {
+                println!("  {} {} - {}", "🔸".blue(), Style::branch_name(name), description);
+            }
+            
+            ctx.info("💡 Templates are auto-detected and applied when project files are found");
+        }
+        
+        IgnoreCmd::Apply { template } => {
+            ctx.info(&format!("📋 Applying template: {}", template));
+            Style::warning("🚧 Manual template application not yet implemented");
+            Style::info("Templates are automatically applied when project files are detected");
+        }
+        
+        IgnoreCmd::Init { force: _force } => {
+            ctx.info("🚀 Initializing smart ignore configuration");
+            
+            let engine = IgnoreEngine::new(std::env::current_dir().context("Failed to get current directory")?)?;
+            engine.save_config()?;
+            
+            Style::success("✅ Smart ignore configuration initialized");
+            ctx.info("📋 Auto-detected project templates:");
+            for template in engine.get_active_templates() {
+                println!("  {} {}", "✅".green(), template);
+            }
+        }
+        
+        IgnoreCmd::Optimize { dry_run } => {
+            ctx.info("🔧 Optimizing ignore rules");
+            
+            if dry_run {
+                Style::info("🔍 DRY RUN - No changes will be made");
+                Style::info("Optimization analysis:");
+                Style::info("  • Duplicate pattern detection");
+                Style::info("  • Priority conflict resolution");
+                Style::info("  • Performance optimization");
+                Style::info("  • Rule consolidation");
+            } else {
+                Style::warning("🚧 Rule optimization not yet implemented");
+                Style::info("Planned optimizations:");
+                Style::info("  • Remove duplicate patterns");
+                Style::info("  • Resolve priority conflicts");
+                Style::info("  • Consolidate similar rules");
+                Style::info("  • Pre-compile patterns for performance");
+            }
+        }
+    }
     
     Ok(())
 }
@@ -1515,6 +1730,10 @@ async fn main() -> anyhow::Result<()> {
 
         Cmd::Push { remote, branch } => {
             push_to_remote(&remote, &branch).await?;
+        }
+
+        Cmd::Ignore { cmd } => {
+            handle_ignore_command(cmd, &ctx).await?;
         }
     }
     Ok(())

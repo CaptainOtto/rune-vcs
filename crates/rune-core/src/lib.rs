@@ -19,6 +19,9 @@ pub struct Commit {
 // Intelligence module moved from rune-cli
 pub mod intelligence;
 
+// Advanced ignore system
+pub mod ignore;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -10,9 +10,14 @@ serde = { workspace = true }
 colored = "2.0"
 blake3 = "1.5"
 serde_json = { workspace = true, optional = true }
+regex = "1.10"
+serde_yaml = "0.9"
+dirs = "5.0"
+anyhow = { workspace = true }
 
 [features]
 serde_json = ["dep:serde_json"]
 
 [dev-dependencies]
 serde_json.workspace = true
+tempfile = "3.0"

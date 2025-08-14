@@ -1,0 +1,59 @@
+version: '1.0'
+global:
+- pattern: '**/.DS_Store'
+  rule_type: Ignore
+  priority: 100
+  description: macOS system files
+  condition: null
+- pattern: '**/Thumbs.db'
+  rule_type: Ignore
+  priority: 100
+  description: Windows thumbnail cache
+  condition: null
+- pattern: '**/*.tmp'
+  rule_type: Ignore
+  priority: 90
+  description: Temporary files
+  condition: null
+- pattern: '**/*.swp'
+  rule_type: Ignore
+  priority: 90
+  description: Vim swap files
+  condition: null
+- pattern: '**/*~'
+  rule_type: Ignore
+  priority: 90
+  description: Backup files
+  condition: null
+project:
+- pattern: target/
+  rule_type: Ignore
+  priority: 50
+  description: 'Auto-detected: Rust project'
+  condition: null
+- pattern: Cargo.lock
+  rule_type: Ignore
+  priority: 50
+  description: 'Auto-detected: Rust project'
+  condition: null
+- pattern: '**/*.rs.bk'
+  rule_type: Ignore
+  priority: 50
+  description: 'Auto-detected: Rust project'
+  condition: null
+- pattern: '**/*.pdb'
+  rule_type: Ignore
+  priority: 50
+  description: 'Auto-detected: Rust project'
+  condition: null
+- pattern: '**/*.log'
+  rule_type: Ignore
+  priority: 80
+  description: Log files
+  condition: null
+templates:
+- rust
+performance:
+  enable_cache: true
+  cache_size: 10000
+  precompile_patterns: true
