@@ -283,6 +283,143 @@ impl Store {
         Ok(id)
     }
 
+    /// Show differences between working directory and staging area, or between commits
+    pub fn diff(&self, target: Option<&str>) -> Result<String> {
+        if let Some(target) = target {
+            if target.contains("..") {
+                // Commit range diff (e.g., "commit1..commit2")
+                let parts: Vec<&str> = target.split("..").collect();
+                if parts.len() == 2 {
+                    self.diff_commits(parts[0], parts[1])
+                } else {
+                    Err(anyhow::anyhow!("Invalid range format. Use commit1..commit2"))
+                }
+            } else {
+                // Single commit diff (show changes from parent to this commit)
+                self.diff_commit(target)
+            }
+        } else {
+            // Working directory diff
+            self.diff_working_directory()
+        }
+    }
+
+    /// Show differences between working directory and the latest commit
+    fn diff_working_directory(&self) -> Result<String> {
+        let mut diff_output = String::new();
+        let current_branch = self.head_ref();
+        let latest_commit_id = self.read_ref(&current_branch);
+        
+        if latest_commit_id.is_none() {
+            return Ok("No commits yet. All files are new.".to_string());
+        }
+
+        // Get all files in working directory
+        let mut working_files = std::collections::HashSet::new();
+        self.collect_files(&self.root, &mut working_files)?;
+        
+        // For simplicity, show a basic status-like diff for now
+        let index = self.read_index()?;
+        
+        for file_path in &working_files {
+            if file_path.starts_with(".rune/") {
+                continue; // Skip .rune directory
+            }
+            
+            let relative_path = file_path.strip_prefix(&self.root)
+                .unwrap_or(file_path.as_path())
+                .to_string_lossy();
+            
+            if index.entries.contains_key(&relative_path.to_string()) {
+                diff_output.push_str(&format!("M  {}\n", relative_path));
+            } else {
+                diff_output.push_str(&format!("??  {}\n", relative_path));
+            }
+        }
+        
+        if diff_output.is_empty() {
+            Ok("No changes in working directory.".to_string())
+        } else {
+            Ok(format!("Changes in working directory:\n{}", diff_output))
+        }
+    }
+
+    /// Show differences for a specific commit (compared to its parent)
+    fn diff_commit(&self, commit_id: &str) -> Result<String> {
+        let commits = self.log();
+        let commit = commits.iter()
+            .find(|c| c.id.starts_with(commit_id))
+            .ok_or_else(|| anyhow::anyhow!("Commit '{}' not found", commit_id))?;
+        
+        let mut diff_output = format!("commit {}\n", commit.id);
+        diff_output.push_str(&format!("Author: {} <{}>\n", commit.author.name, commit.author.email));
+        diff_output.push_str(&format!("Date: {}\n\n", 
+            chrono::DateTime::<chrono::Utc>::from_timestamp(commit.time, 0)
+                .unwrap_or_default()
+                .format("%Y-%m-%d %H:%M:%S UTC")));
+        diff_output.push_str(&format!("    {}\n\n", commit.message));
+        
+        for file in &commit.files {
+            diff_output.push_str(&format!("+++ {}\n", file));
+        }
+        
+        Ok(diff_output)
+    }
+
+    /// Show differences between two commits
+    fn diff_commits(&self, commit1: &str, commit2: &str) -> Result<String> {
+        let commits = self.log();
+        
+        let c1 = commits.iter()
+            .find(|c| c.id.starts_with(commit1))
+            .ok_or_else(|| anyhow::anyhow!("Commit '{}' not found", commit1))?;
+            
+        let c2 = commits.iter()
+            .find(|c| c.id.starts_with(commit2))
+            .ok_or_else(|| anyhow::anyhow!("Commit '{}' not found", commit2))?;
+        
+        let mut diff_output = format!("diff {}..{}\n", c1.id, c2.id);
+        
+        // Simple implementation: show files that changed between commits
+        let files1: std::collections::HashSet<_> = c1.files.iter().collect();
+        let files2: std::collections::HashSet<_> = c2.files.iter().collect();
+        
+        // Files only in commit2 (added)
+        for file in files2.difference(&files1) {
+            diff_output.push_str(&format!("+++ {}\n", file));
+        }
+        
+        // Files only in commit1 (removed)
+        for file in files1.difference(&files2) {
+            diff_output.push_str(&format!("--- {}\n", file));
+        }
+        
+        // Files in both (potentially modified - simplified)
+        for file in files1.intersection(&files2) {
+            diff_output.push_str(&format!("    {}\n", file));
+        }
+        
+        Ok(diff_output)
+    }
+
+    /// Helper method to collect all files in a directory
+    fn collect_files(&self, dir: &std::path::Path, files: &mut std::collections::HashSet<std::path::PathBuf>) -> Result<()> {
+        if dir.is_dir() {
+            for entry in fs::read_dir(dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.is_dir() {
+                    if !path.file_name().unwrap().to_string_lossy().starts_with('.') {
+                        self.collect_files(&path, files)?;
+                    }
+                } else {
+                    files.insert(path);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn read_index(&self) -> Result<Index> {
         let p = self.rune_dir.join("index.json");
         if p.exists() {

@@ -821,12 +821,20 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Cmd::Diff { target } => {
-            let _s = Store::discover(std::env::current_dir()?)?;
-            Style::info("Diff functionality coming soon!");
-            if let Some(t) = target {
-                Style::info(&format!("Would show diff for: {}", t));
-            } else {
-                Style::info("Would show working directory changes");
+            let s = Store::discover(std::env::current_dir()?)?;
+            
+            match s.diff(target.as_deref()) {
+                Ok(diff_output) => {
+                    if diff_output.trim().is_empty() {
+                        Style::info("No differences found");
+                    } else {
+                        println!("{}", diff_output);
+                    }
+                }
+                Err(e) => {
+                    Style::error(&format!("Failed to generate diff: {}", e));
+                    return Err(anyhow::anyhow!("Diff failed"));
+                }
             }
         }
 

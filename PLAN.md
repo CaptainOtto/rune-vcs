@@ -34,7 +34,7 @@
   - [x] `rune branch <name>` - Create and list branches ✅ **COMPLETE** 
   - [x] `rune checkout <branch>` - Switch branches ✅ **COMPLETE**
   - [x] `rune merge <branch>` - Merge branches ✅ **COMPLETE**
-  - [ ] `rune diff [files]` - Show file differences
+  - [x] `rune diff [files]` - Show file differences ✅ **COMPLETE**
   - [ ] `rune reset [--hard]` - Reset changes
   - [ ] `rune show <commit>` - Show commit details
 
