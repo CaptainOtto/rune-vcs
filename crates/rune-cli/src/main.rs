@@ -643,11 +643,7 @@ async fn main() -> anyhow::Result<()> {
                 Style::success(&format!("Created branch {}", Style::branch_name(&n)));
             } else {
                 // List branches
-                let current_branch = s.head_ref();
-                let current_branch_name = current_branch
-                    .strip_prefix("refs/heads/")
-                    .unwrap_or(&current_branch);
-                
+                let current_branch_name = s.current_branch().unwrap_or_else(|| "main".to_string());
                 let branches = s.list_branches()?;
 
                 if fmt == "json" {
@@ -669,7 +665,7 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     if branches.is_empty() {
                         Style::info("No branches found");
-                        Style::info(&format!("Current: {}", Style::branch_name(current_branch_name)));
+                        Style::info(&format!("Current: {}", Style::branch_name(&current_branch_name)));
                     } else {
                         for branch in branches {
                             if branch == current_branch_name {
@@ -684,14 +680,26 @@ async fn main() -> anyhow::Result<()> {
         }
         Cmd::Checkout { name } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            let r = format!("refs/heads/{}", name);
-            if s.read_ref(&r).is_none() && !s.rune_dir.join(&r).exists() {
-                Style::error(&format!("Branch '{}' not found", name));
-                Style::info("Use 'rune branch' to see available branches");
-                return Ok(());
+            
+            // Check if trying to checkout current branch
+            if let Some(current) = s.current_branch() {
+                if current == name {
+                    Style::info(&format!("Already on branch {}", Style::branch_name(&name)));
+                    return Ok(());
+                }
             }
-            s.set_head(&r)?;
-            Style::success(&format!("Switched to branch {}", Style::branch_name(&name)));
+            
+            // Attempt to checkout the branch
+            match s.checkout_branch(&name) {
+                Ok(()) => {
+                    Style::success(&format!("Switched to branch {}", Style::branch_name(&name)));
+                }
+                Err(e) => {
+                    Style::error(&format!("Failed to checkout branch '{}': {}", name, e));
+                    Style::info("Use 'rune branch' to see available branches");
+                    return Err(anyhow::anyhow!("Checkout failed"));
+                }
+            }
         }
         Cmd::Stash { apply } => {
             let s = Store::discover(std::env::current_dir()?)?;

@@ -174,6 +174,30 @@ impl Store {
         self.read_ref(&branch_ref).is_some()
     }
 
+    /// Checkout (switch to) a branch
+    pub fn checkout_branch(&self, name: &str) -> Result<()> {
+        let branch_ref = format!("refs/heads/{}", name);
+        
+        // Check if branch exists
+        if !self.branch_exists(name) {
+            return Err(anyhow::anyhow!("Branch '{}' does not exist", name));
+        }
+        
+        // Set HEAD to point to the new branch
+        self.set_head(&branch_ref)?;
+        Ok(())
+    }
+
+    /// Get the current branch name from HEAD
+    pub fn current_branch(&self) -> Option<String> {
+        let head_ref = self.head_ref();
+        if head_ref.starts_with("refs/heads/") {
+            Some(head_ref.strip_prefix("refs/heads/")?.to_string())
+        } else {
+            None
+        }
+    }
+
     pub fn read_index(&self) -> Result<Index> {
         let p = self.rune_dir.join("index.json");
         if p.exists() {

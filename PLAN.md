@@ -32,7 +32,7 @@
 ### Essential VCS Commands Implementation
 - [🔄] **Complete Missing CLI Commands**
   - [x] `rune branch <name>` - Create and list branches ✅ **COMPLETE** 
-  - [ ] `rune checkout <branch>` - Switch branches
+  - [x] `rune checkout <branch>` - Switch branches ✅ **COMPLETE**
   - [ ] `rune merge <branch>` - Merge branches
   - [ ] `rune diff [files]` - Show file differences
   - [ ] `rune reset [--hard]` - Reset changes
