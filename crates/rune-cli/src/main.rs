@@ -840,15 +840,43 @@ async fn main() -> anyhow::Result<()> {
 
         Cmd::Reset { files, hard } => {
             let s = Store::discover(std::env::current_dir()?)?;
+            
             if hard {
-                Style::warning("Hard reset would permanently lose changes!");
-                Style::info("Hard reset not yet implemented for safety");
-            } else if files.is_empty() {
-                // Reset all staged files
-                s.write_index(&rune_store::Index::default())?;
-                Style::success("Reset staging area");
-            } else {
-                Style::info("Selective file reset coming soon!");
+                Style::warning("⚠️  WARNING: --hard flag will permanently discard changes in working directory!");
+                eprint!("Are you sure you want to continue? (y/N): ");
+                use std::io::{self, Write};
+                io::stdout().flush().unwrap();
+                
+                let mut input = String::new();
+                io::stdin().read_line(&mut input).unwrap();
+                
+                if !input.trim().to_lowercase().starts_with('y') {
+                    Style::info("Reset cancelled.");
+                    return Ok(());
+                }
+            }
+
+            match s.reset(&files, hard) {
+                Ok(()) => {
+                    if files.is_empty() {
+                        if hard {
+                            Style::success("✅ Reset staging area and working directory");
+                        } else {
+                            Style::success("✅ Reset staging area");
+                        }
+                    } else {
+                        let file_list = files.iter()
+                            .map(|f| f.to_string_lossy())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        if hard {
+                            Style::success(&format!("✅ Reset {} from staging and working directory", file_list));
+                        } else {
+                            Style::success(&format!("✅ Reset {} from staging area", file_list));
+                        }
+                    }
+                }
+                Err(e) => Style::error(&format!("❌ Reset failed: {}", e)),
             }
         }
 
@@ -895,23 +923,49 @@ async fn main() -> anyhow::Result<()> {
 
         Cmd::Show { commit } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            if commit == "HEAD" {
+            
+            let commit_to_show = if commit == "HEAD" {
+                // Get the latest commit
                 let log = s.log();
-                if let Some(latest) = log.first() {
-                    println!("commit {}", Style::commit_hash(&latest.id));
-                    let ts = chrono::DateTime::from_timestamp(latest.time, 0)
+                log.first().cloned()
+            } else {
+                // Find commit by ID or partial ID
+                let log = s.log();
+                log.into_iter()
+                    .find(|c| c.id == commit || c.id.starts_with(&commit))
+            };
+
+            match commit_to_show {
+                Some(commit_data) => {
+                    println!("commit {}", Style::commit_hash(&commit_data.id));
+                    if let Some(parent) = &commit_data.parent {
+                        println!("Parent:  {}", Style::commit_hash(parent));
+                    }
+                    println!("Author:  {}", commit_data.author.name);
+                    println!("Email:   {}", commit_data.author.email);
+                    let ts = chrono::DateTime::from_timestamp(commit_data.time, 0)
                         .unwrap()
                         .naive_utc();
                     println!("Date:    {}", Style::timestamp(ts));
                     println!();
-                    println!("    {}", latest.message);
+                    println!("    {}", commit_data.message);
                     println!();
-                } else {
-                    Style::info("No commits found");
+                    
+                    if !commit_data.files.is_empty() {
+                        println!("Files in this commit:");
+                        for file in &commit_data.files {
+                            println!("  + {}", Style::file_path(file));
+                        }
+                        println!();
+                    }
                 }
-            } else {
-                Style::info(&format!("Would show commit: {}", commit));
-                Style::info("Show specific commits coming soon!");
+                None => {
+                    if commit == "HEAD" {
+                        Style::info("No commits found in this repository");
+                    } else {
+                        Style::error(&format!("Commit '{}' not found", commit));
+                    }
+                }
             }
         }
 

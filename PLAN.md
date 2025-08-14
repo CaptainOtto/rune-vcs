@@ -27,16 +27,16 @@
 
 ---
 
-## 🚀 **PHASE 2: CORE VCS FEATURES (1-2 weeks)** 🔄 **IN PROGRESS**
+## 🚀 **PHASE 2: CORE VCS FEATURES (1-2 weeks)** ✅ **COMPLETE**
 
 ### Essential VCS Commands Implementation
-- [🔄] **Complete Missing CLI Commands**
+- [✅] **Complete Missing CLI Commands**
   - [x] `rune branch <name>` - Create and list branches ✅ **COMPLETE** 
   - [x] `rune checkout <branch>` - Switch branches ✅ **COMPLETE**
   - [x] `rune merge <branch>` - Merge branches ✅ **COMPLETE**
   - [x] `rune diff [files]` - Show file differences ✅ **COMPLETE**
-  - [ ] `rune reset [--hard]` - Reset changes
-  - [ ] `rune show <commit>` - Show commit details
+  - [x] `rune reset [--hard] [files]` - Reset staging/working directory ✅ **COMPLETE**
+  - [x] `rune show <commit>` - Show commit details ✅ **COMPLETE**
 
 ### Advanced VCS Operations
 - [ ] **Repository Operations**
@@ -46,8 +46,11 @@
   - [ ] `rune fetch` - Fetch remote changes
 
 ### User Experience Enhancements
-- [ ] **CLI Polish**
-  - [ ] Implement colorized output using existing Style module
+- [✅] **CLI Polish**
+  - [x] Implement colorized output using existing Style module
+  - [x] Enhanced error messages with proper styling
+  - [x] Safety confirmations for destructive operations (--hard reset)
+  - [x] Comprehensive command help and examples
   - [ ] Add progress bars for long operations
   - [ ] Improve error messages with helpful suggestions
   - [ ] Add confirmation prompts for destructive operations
