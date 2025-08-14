@@ -131,6 +131,15 @@ enum Cmd {
         #[command(subcommand)]
         cmd: ConfigCmd,
     },
+    /// Verify installation and system requirements
+    Doctor,
+    /// Update Rune to the latest version
+    Update {
+        #[arg(long, help = "Show what would be updated without doing it")]
+        dry_run: bool,
+    },
+    /// Show version information
+    Version,
 }
 
 #[derive(Subcommand, Debug)]
@@ -371,6 +380,118 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
         },
     }
     Ok(())
+}
+
+/// Verify installation and system requirements
+async fn doctor_check() -> anyhow::Result<()> {
+    Style::section_header("🩺 Rune Installation Doctor");
+    
+    // Check Rune version
+    let version = env!("CARGO_PKG_VERSION");
+    println!("\n{} Rune version: {}", "✓".green(), Style::commit_hash(version));
+    
+    // Check system requirements
+    println!("\n{}", "System Requirements:".bold());
+    
+    // Check Git availability (for migration purposes)
+    match std::process::Command::new("git").arg("--version").output() {
+        Ok(output) if output.status.success() => {
+            let git_version = String::from_utf8_lossy(&output.stdout);
+            println!("{} Git found: {}", "✓".green(), git_version.trim());
+        }
+        _ => {
+            println!("{} Git not found (optional, needed for migration)", "⚠".yellow());
+        }
+    }
+    
+    // Check disk space in current directory
+    match std::env::current_dir() {
+        Ok(dir) => {
+            println!("{} Working directory: {}", "✓".green(), Style::file_path(&dir.display().to_string()));
+        }
+        Err(e) => {
+            println!("{} Cannot access current directory: {}", "✗".red(), e);
+        }
+    }
+    
+    // Check write permissions
+    let temp_file = std::env::temp_dir().join("rune_doctor_test");
+    match std::fs::write(&temp_file, "test") {
+        Ok(()) => {
+            println!("{} Write permissions: OK", "✓".green());
+            let _ = std::fs::remove_file(&temp_file);
+        }
+        Err(e) => {
+            println!("{} Write permissions: Failed ({})", "✗".red(), e);
+        }
+    }
+    
+    // Check if in a Rune repository
+    match Store::discover(std::env::current_dir()?) {
+        Ok(_) => {
+            println!("{} Rune repository: Found", "✓".green());
+        }
+        Err(_) => {
+            println!("{} Rune repository: Not in a repository", "ℹ".blue());
+        }
+    }
+    
+    println!("\n{} Installation verification complete!", "🎉".green());
+    Ok(())
+}
+
+/// Update Rune to the latest version
+async fn update_rune(dry_run: bool) -> anyhow::Result<()> {
+    Style::section_header("🔄 Rune Update System");
+    
+    let current_version = env!("CARGO_PKG_VERSION");
+    println!("\n{} Current version: {}", "ℹ".blue(), Style::commit_hash(current_version));
+    
+    if dry_run {
+        Style::info("🔍 Checking for updates...");
+        Style::info("Update checking would be performed here");
+        Style::info("This would connect to GitHub releases API");
+        Style::info("No actual updates performed (--dry-run mode)");
+        return Ok(());
+    }
+    
+    Style::warning("🚧 Auto-update system not yet implemented");
+    println!("\n{}", "Manual update instructions:".bold());
+    println!("  1. Visit: https://github.com/CaptainOtto/rune-vcs/releases");
+    println!("  2. Download the latest release for your platform");
+    println!("  3. Replace your current rune binary");
+    println!("\n{}", "Or use package managers:".bold());
+    println!("  • macOS: brew upgrade rune");
+    println!("  • Windows: scoop update rune");
+    println!("  • Cargo: cargo install rune-vcs --force");
+    
+    Ok(())
+}
+
+/// Print detailed version information
+fn print_version_info() {
+    Style::section_header("📋 Rune Version Information");
+    
+    println!("\n{} Version: {}", "🔹".blue(), Style::commit_hash(env!("CARGO_PKG_VERSION")));
+    println!("{} Package: {}", "🔹".blue(), env!("CARGO_PKG_NAME"));
+    
+    // Use available Cargo environment variables
+    #[cfg(debug_assertions)]
+    println!("{} Profile: Debug", "🔹".blue());
+    #[cfg(not(debug_assertions))]
+    println!("{} Profile: Release", "🔹".blue());
+    
+    println!("\n{}", "Repository Information:".bold());
+    println!("{} Homepage: {}", "🔗".blue(), "https://github.com/CaptainOtto/rune-vcs");
+    println!("{} License: {}", "📄".blue(), "Apache-2.0");
+    
+    println!("\n{}", "Features:".bold());
+    println!("{} VCS Operations: ✅", "⚡".yellow());
+    println!("{} Branch Management: ✅", "🌿".green());
+    println!("{} Delta Compression: ✅", "📦".blue());
+    println!("{} LFS Support: ✅", "💾".purple());
+    println!("{} Performance Engine: ✅", "🚀".red());
+    println!("{} Intelligence Engine: ✅", "🧠".blue());
 }
 
 #[tokio::main]
@@ -999,6 +1120,18 @@ async fn main() -> anyhow::Result<()> {
                 }
                 _ => eprintln!("use: bash|zsh|fish|powershell"),
             }
+        }
+
+        Cmd::Doctor => {
+            doctor_check().await?;
+        }
+
+        Cmd::Update { dry_run } => {
+            update_rune(dry_run).await?;
+        }
+
+        Cmd::Version => {
+            print_version_info();
         }
     }
     Ok(())

@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Rune VCS development container
+  rune-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rune-dev
+    volumes:
+      # Mount current directory as workspace
+      - ./:/workspace:rw
+      # Preserve Rust cargo cache
+      - cargo-cache:/usr/local/cargo/registry
+      # Preserve target directory for faster builds
+      - target-cache:/workspace/target
+    working_dir: /workspace
+    command: /bin/bash
+    tty: true
+    stdin_open: true
+    environment:
+      - RUST_LOG=debug
+      - RUNE_DEVELOPMENT=true
+
+  # Rune VCS with volume for persistence
+  rune-workspace:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rune-workspace
+    volumes:
+      # Persistent workspace for repositories
+      - rune-repos:/workspace:rw
+      # Configuration persistence
+      - rune-config:/home/rune/.config/rune:rw
+      - rune-data:/home/rune/.local/share/rune:rw
+    working_dir: /workspace
+    command: rune status
+    tty: true
+    stdin_open: true
+
+  # Quick one-off container for testing
+  rune-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rune-test
+    volumes:
+      - ./test_files:/workspace:rw
+    working_dir: /workspace
+    command: rune doctor
+    tty: true
+
+volumes:
+  cargo-cache:
+    driver: local
+  target-cache:
+    driver: local
+  rune-repos:
+    driver: local
+  rune-config:
+    driver: local
+  rune-data:
+    driver: local

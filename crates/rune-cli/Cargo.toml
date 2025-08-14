@@ -4,6 +4,17 @@ name = "rune-cli"
 version = "0.0.1"
 edition = "2021"
 license = "Apache-2.0"
+description = "Rune VCS - Command-line interface for the modern version control system"
+homepage = "https://github.com/CaptainOtto/rune-vcs"
+repository = "https://github.com/CaptainOtto/rune-vcs"
+documentation = "https://docs.rs/rune-cli"
+readme = "../../README.md"
+keywords = ["vcs", "git", "version-control", "dvcs", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "rune"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }

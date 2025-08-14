@@ -17,6 +17,13 @@ edition = "2021"
 license = "Apache-2.0"
 version = "0.0.1"
 authors = ["Rune Maintainers <dev@example.invalid>"]
+description = "Rune - A modern, intelligent version control system"
+homepage = "https://github.com/CaptainOtto/rune-vcs"
+repository = "https://github.com/CaptainOtto/rune-vcs"
+documentation = "https://docs.rs/rune-vcs"
+readme = "README.md"
+keywords = ["vcs", "git", "version-control", "dvcs", "cli"]
+categories = ["command-line-utilities", "development-tools"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
