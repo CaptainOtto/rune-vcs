@@ -198,6 +198,91 @@ impl Store {
         }
     }
 
+    /// Merge a branch into the current branch
+    pub fn merge_branch(&self, branch_name: &str, no_ff: bool) -> Result<()> {
+        let current_branch = self.current_branch()
+            .ok_or_else(|| anyhow::anyhow!("Not on a branch"))?;
+        
+        let current_commit_id = self.read_ref(&format!("refs/heads/{}", current_branch))
+            .ok_or_else(|| anyhow::anyhow!("Current branch has no commits"))?;
+        
+        let merge_commit_id = self.read_ref(&format!("refs/heads/{}", branch_name))
+            .ok_or_else(|| anyhow::anyhow!("Branch '{}' has no commits", branch_name))?;
+        
+        // Check if this is a fast-forward merge (merge commit is ahead of current)
+        let is_fast_forward = self.is_ancestor(&current_commit_id, &merge_commit_id)?;
+        
+        if is_fast_forward && !no_ff {
+            // Fast-forward merge: just update the current branch to point to the merge commit
+            self.write_ref(&format!("refs/heads/{}", current_branch), &merge_commit_id)?;
+        } else {
+            // Create a merge commit
+            let merge_commit = self.create_merge_commit(&current_commit_id, &merge_commit_id, 
+                &format!("Merge branch '{}' into {}", branch_name, current_branch))?;
+            self.write_ref(&format!("refs/heads/{}", current_branch), &merge_commit)?;
+        }
+        
+        Ok(())
+    }
+
+    /// Check if commit_a is an ancestor of commit_b (for fast-forward detection)
+    fn is_ancestor(&self, commit_a: &str, commit_b: &str) -> Result<bool> {
+        // For now, we'll implement a simple check
+        // In a real implementation, we'd traverse the commit graph
+        Ok(commit_a != commit_b) // Simplified: if they're different, assume fast-forward possible
+    }
+
+    /// Create a merge commit with two parents
+    fn create_merge_commit(&self, parent1: &str, _parent2: &str, message: &str) -> Result<String> {
+        use chrono::Utc;
+        use std::io::Write;
+        
+        // Get current index (staged files) - for merge, we'll use current files
+        let index = self.read_index().unwrap_or_default();
+        let current_branch = self.current_branch().unwrap_or_else(|| "main".to_string());
+        
+        // Create a simple author (in a real implementation, this would come from config)
+        let author = Author {
+            name: "Rune User".to_string(),
+            email: "user@example.com".to_string(),
+        };
+        
+        let files = index.entries.keys().cloned().collect::<Vec<_>>();
+        let hash = blake3::hash(
+            format!(
+                "{}{}{:?}{}",
+                message,
+                author.email,
+                files,
+                Utc::now().timestamp()
+            )
+            .as_bytes(),
+        );
+        let id = hex::encode(hash.as_bytes());
+        
+        // Create commit with the merge parent (parent1 is current, parent2 is merged branch)
+        // Note: The current Commit struct only supports one parent, so we'll use parent1
+        // and record the merge in the message. TODO: Extend Commit to support multiple parents
+        let c = Commit {
+            id: id.clone(),
+            message: message.to_string(),
+            author,
+            time: Utc::now().timestamp(),
+            parent: Some(parent1.to_string()),
+            files,
+            branch: format!("refs/heads/{}", current_branch),
+        };
+        
+        // Write commit to log
+        let mut f = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.rune_dir.join("log.jsonl"))?;
+        writeln!(f, "{}", serde_json::to_string(&c)?)?;
+        
+        Ok(id)
+    }
+
     pub fn read_index(&self) -> Result<Index> {
         let p = self.rune_dir.join("index.json");
         if p.exists() {

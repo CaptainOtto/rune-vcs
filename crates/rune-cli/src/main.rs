@@ -73,6 +73,13 @@ enum Cmd {
     Checkout {
         name: String,
     },
+    /// Merge a branch into the current branch
+    Merge {
+        #[arg(help = "Branch to merge into current branch")]
+        branch: String,
+        #[arg(long, help = "Create merge commit even for fast-forward")]
+        no_ff: bool,
+    },
     Stash {
         #[arg(long)]
         apply: bool,
@@ -698,6 +705,39 @@ async fn main() -> anyhow::Result<()> {
                     Style::error(&format!("Failed to checkout branch '{}': {}", name, e));
                     Style::info("Use 'rune branch' to see available branches");
                     return Err(anyhow::anyhow!("Checkout failed"));
+                }
+            }
+        }
+        Cmd::Merge { branch, no_ff } => {
+            let s = Store::discover(std::env::current_dir()?)?;
+            
+            // Check if branch exists
+            if !s.branch_exists(&branch) {
+                Style::error(&format!("Branch '{}' does not exist", branch));
+                Style::info("Use 'rune branch' to see available branches");
+                return Err(anyhow::anyhow!("Merge failed"));
+            }
+            
+            // Check if trying to merge current branch into itself
+            if let Some(current) = s.current_branch() {
+                if current == branch {
+                    Style::info(&format!("Already on branch {}", Style::branch_name(&branch)));
+                    Style::info("Nothing to merge");
+                    return Ok(());
+                }
+            }
+            
+            // Attempt to merge the branch
+            match s.merge_branch(&branch, no_ff) {
+                Ok(()) => {
+                    Style::success(&format!("Merged branch {} into {}", 
+                        Style::branch_name(&branch), 
+                        Style::branch_name(&s.current_branch().unwrap_or_else(|| "main".to_string()))
+                    ));
+                }
+                Err(e) => {
+                    Style::error(&format!("Failed to merge branch '{}': {}", branch, e));
+                    return Err(anyhow::anyhow!("Merge failed"));
                 }
             }
         }
