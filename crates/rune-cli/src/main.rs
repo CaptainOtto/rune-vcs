@@ -10,6 +10,7 @@ use style::{init_colors, Style};
 use rune_performance::PerformanceEngine;
 use rune_core::intelligence::{IntelligentFileAnalyzer, InsightSeverity};
 use rune_core::ignore::{IgnoreEngine, IgnoreRule, RuleType};
+use rune_docs::DocsEngine;
 use anyhow::Context;
 
 /// Global execution context carrying user preferences
@@ -161,6 +162,72 @@ enum IgnoreCmd {
 }
 
 #[derive(Subcommand, Debug)]
+enum DocsCmd {
+    /// View a specific topic in the documentation
+    View {
+        #[arg(help = "Topic to view (getting-started, commands, migration, best-practices, troubleshooting)")]
+        topic: String,
+    },
+    /// Search documentation content
+    Search {
+        #[arg(help = "Search query")]
+        query: String,
+    },
+    /// Start local documentation server
+    Serve {
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        addr: String,
+        #[arg(long, help = "Open browser automatically")]
+        open: bool,
+    },
+    /// List all available documentation topics
+    List,
+}
+
+#[derive(Subcommand, Debug)]
+enum ExamplesCmd {
+    /// View examples for a specific category
+    Category {
+        #[arg(help = "Category to view (basic, branching, remote, ignore, files, workflow, migration, troubleshooting)")]
+        name: String,
+    },
+    /// Search examples by keyword
+    Search {
+        #[arg(help = "Search query")]
+        query: String,
+    },
+    /// Show a specific example by name
+    Show {
+        #[arg(help = "Example name")]
+        name: String,
+    },
+    /// List all available examples
+    List {
+        #[arg(long, help = "Show only category names")]
+        categories: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum TutorialCmd {
+    /// Start the basics tutorial
+    Basics,
+    /// Start the branching tutorial
+    Branching,
+    /// Start the collaboration tutorial
+    Collaboration,
+    /// Start the advanced features tutorial
+    Advanced,
+    /// List all available tutorials
+    List,
+    /// Resume a tutorial from where you left off
+    Resume {
+        #[arg(help = "Tutorial name to resume")]
+        name: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 enum Cmd {
     /// Run local JSON API server
     Api {
@@ -277,6 +344,21 @@ enum Cmd {
     Patch {
         #[command(subcommand)]
         cmd: PatchCmd,
+    },
+    /// Access documentation and help
+    Docs {
+        #[command(subcommand)]
+        cmd: DocsCmd,
+    },
+    /// View examples for common workflows
+    Examples {
+        #[command(subcommand)]
+        cmd: ExamplesCmd,
+    },
+    /// Start interactive tutorials
+    Tutorial {
+        #[command(subcommand)]
+        cmd: TutorialCmd,
     },
     #[command(subcommand)]
     Lfs(commands::lfs::LfsCmd),
@@ -1055,6 +1137,236 @@ async fn handle_ignore_command(cmd: IgnoreCmd, ctx: &RuneContext) -> anyhow::Res
     Ok(())
 }
 
+/// Handle documentation-related commands
+async fn handle_docs_command(cmd: DocsCmd, ctx: &RuneContext) -> anyhow::Result<()> {
+    let docs_engine = DocsEngine::new()?;
+    
+    match cmd {
+        DocsCmd::View { topic } => {
+            ctx.info(&format!("📖 Viewing documentation: {}", topic));
+            let content = docs_engine.get_topic_content(&topic)?;
+            println!("{}", content);
+        }
+        
+        DocsCmd::Search { query } => {
+            ctx.info(&format!("🔍 Searching documentation for: {}", query));
+            let results = docs_engine.search(&query);
+            
+            if results.is_empty() {
+                Style::warning("No results found.");
+            } else {
+                Style::success(&format!("Found {} results:", results.len()));
+                for result in results {
+                    println!("\n📄 {}", result.title.bold());
+                    println!("   {}", result.snippet);
+                    if !result.url.is_empty() {
+                        println!("   � URL: {}", result.url.dimmed());
+                    }
+                }
+            }
+        }
+        
+        DocsCmd::Serve { addr, open } => {
+            ctx.info(&format!("🌐 Starting documentation server at http://{}", addr));
+            
+            if open {
+                // Try to open the browser
+                let url = format!("http://{}", addr);
+                if let Err(e) = open::that(&url) {
+                    Style::warning(&format!("Could not open browser: {}", e));
+                } else {
+                    Style::success("Opening documentation in browser...");
+                }
+            }
+            
+            docs_engine.start_server(&addr).await?;
+        }
+        
+        DocsCmd::List => {
+            ctx.info("📚 Available documentation topics:");
+            let topics = vec![
+                ("getting-started", "Getting started with Rune"),
+                ("commands", "Complete command reference"),
+                ("migration", "Migrating from Git"),
+                ("best-practices", "Best practices and workflows"),
+                ("troubleshooting", "Common issues and solutions"),
+            ];
+            
+            for (topic, description) in topics {
+                println!("  {} {}", topic.bold().blue(), description);
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// Handle examples-related commands
+async fn handle_examples_command(cmd: ExamplesCmd, ctx: &RuneContext) -> anyhow::Result<()> {
+    let docs_engine = DocsEngine::new()?;
+    
+    match cmd {
+        ExamplesCmd::Category { name } => {
+            ctx.info(&format!("📝 Examples for category: {}", name));
+            let examples = docs_engine.get_examples_by_category(&name);
+            
+            if examples.is_empty() {
+                Style::warning(&format!("No examples found for category: {}", name));
+                Style::info("Available categories: basic, branching, remote, ignore, files, workflow, migration, troubleshooting");
+            } else {
+                for example in examples {
+                    println!("\n{} {}", "📋".blue(), example.title.bold());
+                    println!("   {}", example.description);
+                    for cmd in &example.commands {
+                        println!("   💡 {}", cmd.cyan());
+                    }
+                    if let Some(output) = &example.expected_output {
+                        println!("   📄 Expected: {}", output.dimmed());
+                    }
+                }
+            }
+        }
+        
+        ExamplesCmd::Search { query } => {
+            ctx.info(&format!("🔍 Searching examples for: {}", query));
+            let examples = docs_engine.search_examples(&query);
+            
+            if examples.is_empty() {
+                Style::warning("No examples found.");
+            } else {
+                Style::success(&format!("Found {} examples:", examples.len()));
+                for example in examples {
+                    println!("\n{} {}", "📋".blue(), example.title.bold());
+                    println!("   📂 Category: {}", example.category);
+                    println!("   {}", example.description);
+                    for cmd in &example.commands {
+                        println!("   💡 {}", cmd.cyan());
+                    }
+                }
+            }
+        }
+        
+        ExamplesCmd::Show { name } => {
+            ctx.info(&format!("📋 Showing example: {}", name));
+            if let Some(example) = docs_engine.get_example_by_name(&name) {
+                // Show the first command for help (or adapt show_command_help to accept multiple)
+                if let Some(first_cmd) = example.commands.first() {
+                    docs_engine.show_command_help(first_cmd)?;
+                } else {
+                    println!("Example '{}' has no commands.", name);
+                }
+            } else {
+                Style::warning(&format!("Example '{}' not found.", name));
+                Style::info("Use 'rune examples list' to see all available examples.");
+            }
+        }
+        
+        ExamplesCmd::List { categories } => {
+            if categories {
+                ctx.info("📂 Available example categories:");
+                let categories = vec![
+                    ("basic", "Basic operations and getting started"),
+                    ("branching", "Branch management and merging"),
+                    ("remote", "Remote repository operations"),
+                    ("ignore", "File ignore patterns and management"),
+                    ("files", "File operations and staging"),
+                    ("workflow", "Complete workflow examples"),
+                    ("migration", "Migrating from other VCS"),
+                    ("troubleshooting", "Problem solving examples"),
+                ];
+                
+                for (cat, desc) in categories {
+                    println!("  {} {}", cat.bold().blue(), desc);
+                }
+            } else {
+                ctx.info("📝 All available examples:");
+                let all_examples = docs_engine.get_all_examples();
+                
+                let mut current_category = String::new();
+                for example in all_examples {
+                    if example.category != current_category {
+                        current_category = example.category.clone();
+                        println!("\n📂 {}", current_category.bold().blue());
+                    }
+                    println!("  {} {}", "📋".blue(), example.title);
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// Handle tutorial-related commands
+async fn handle_tutorial_command(cmd: TutorialCmd, ctx: &RuneContext) -> anyhow::Result<()> {
+    let docs_engine = DocsEngine::new()?;
+    
+    match cmd {
+        TutorialCmd::Basics => {
+            ctx.info("🎓 Starting Basics Tutorial");
+            if let Some(tutorial) = docs_engine.get_tutorial("basics") {
+                docs_engine.run_interactive_tutorial(tutorial).await?;
+            } else {
+                Style::warning("Basics tutorial not found");
+            }
+        }
+        
+        TutorialCmd::Branching => {
+            ctx.info("🎓 Starting Branching Tutorial");
+            if let Some(tutorial) = docs_engine.get_tutorial("branching") {
+                docs_engine.run_interactive_tutorial(tutorial).await?;
+            } else {
+                Style::warning("Branching tutorial not found");
+            }
+        }
+        
+        TutorialCmd::Collaboration => {
+            ctx.info("🎓 Starting Collaboration Tutorial");
+            if let Some(tutorial) = docs_engine.get_tutorial("collaboration") {
+                docs_engine.run_interactive_tutorial(tutorial).await?;
+            } else {
+                Style::warning("Collaboration tutorial not found");
+            }
+        }
+        
+        TutorialCmd::Advanced => {
+            ctx.info("🎓 Starting Advanced Tutorial");
+            if let Some(tutorial) = docs_engine.get_tutorial("advanced") {
+                docs_engine.run_interactive_tutorial(tutorial).await?;
+            } else {
+                Style::warning("Advanced tutorial not found");
+            }
+        }
+        
+        TutorialCmd::List => {
+            ctx.info("🎓 Available tutorials:");
+            let tutorials = vec![
+                ("basics", "Learn the fundamentals of Rune VCS"),
+                ("branching", "Master branch management and merging"),
+                ("collaboration", "Team workflows and remote repositories"),
+                ("advanced", "Advanced features and optimization"),
+            ];
+            
+            for (tutorial, description) in tutorials {
+                println!("  {} {}", tutorial.bold().blue(), description);
+            }
+            
+            Style::info("\nStart a tutorial with: rune tutorial <name>");
+        }
+        
+        TutorialCmd::Resume { name } => {
+            ctx.info(&format!("🔄 Resuming tutorial: {}", name));
+            if let Some(tutorial) = docs_engine.get_tutorial(&name) {
+                docs_engine.resume_tutorial(tutorial).await?;
+            } else {
+                Style::warning(&format!("Tutorial '{}' not found.", name));
+            }
+        }
+    }
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_colors();
@@ -1734,6 +2046,18 @@ async fn main() -> anyhow::Result<()> {
 
         Cmd::Ignore { cmd } => {
             handle_ignore_command(cmd, &ctx).await?;
+        }
+
+        Cmd::Docs { cmd } => {
+            handle_docs_command(cmd, &ctx).await?;
+        }
+
+        Cmd::Examples { cmd } => {
+            handle_examples_command(cmd, &ctx).await?;
+        }
+
+        Cmd::Tutorial { cmd } => {
+            handle_tutorial_command(cmd, &ctx).await?;
         }
     }
     Ok(())

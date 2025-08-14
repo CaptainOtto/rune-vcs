@@ -2,14 +2,14 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/rune-core",
-  "crates/rune-store",
-  "crates/rune-cli",
-  "crates/rune-lfs",
-  "crates/rune-remote",
-  "crates/rune-pack",
-  "crates/rune-delta",
-  "crates/rune-performance",
+    "crates/rune-cli",
+    "crates/rune-core", 
+    "crates/rune-store",
+    "crates/rune-delta",
+    "crates/rune-pack",
+    "crates/rune-lfs",
+    "crates/rune-remote",
+    "crates/rune-docs",
 ]
 
 [workspace.package]
