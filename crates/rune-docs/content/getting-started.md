@@ -8,7 +8,7 @@ Rune is a next-generation version control system designed to be faster, more int
 
 - **Lightning Fast**: Built in Rust for maximum performance
 - **Intelligent Analysis**: AI-powered insights for your code
-- **User Friendly**: Intuitive commands and helpful guidance  
+- **User Friendly**: Intuitive commands and helpful guidance
 - **Git Compatible**: Easy migration from existing Git repositories
 - **Advanced Features**: Built-in LFS, delta compression, and more
 
@@ -17,23 +17,27 @@ Rune is a next-generation version control system designed to be faster, more int
 ### From Package Managers
 
 #### macOS (Homebrew)
+
 ```bash
 brew tap rune-vcs/tap
 brew install rune
 ```
 
 #### Windows (Scoop)
+
 ```bash
 scoop bucket add rune https://github.com/rune-vcs/scoop-bucket.git
 scoop install rune
 ```
 
 #### Linux (Snap)
+
 ```bash
 snap install rune-vcs
 ```
 
 ### From Source
+
 ```bash
 git clone https://github.com/rune-vcs/rune.git
 cd rune
@@ -43,6 +47,7 @@ cargo build --release
 ## First Steps
 
 ### Creating a new repository
+
 ```bash
 mkdir my-project
 cd my-project
@@ -53,6 +58,7 @@ rune commit -m "Initial commit"
 ```
 
 ### Daily development
+
 ```bash
 # Check status
 rune status
@@ -66,6 +72,7 @@ rune log
 ```
 
 ### Working with branches
+
 ```bash
 # Create and switch to a new branch
 rune branch feature/new-functionality

@@ -5,14 +5,14 @@ use api::serve_api;
 use rune_store::Store;
 pub mod commands;
 mod style;
+use anyhow::Context;
 use colored::*;
-use style::{init_colors, Style};
-use rune_performance::PerformanceEngine;
 use rune_core::ignore::{IgnoreEngine, IgnoreRule, RuleType};
 use rune_docs::DocsEngine;
-use anyhow::Context;
+use rune_performance::PerformanceEngine;
+use style::{init_colors, Style};
 pub mod intelligence;
-use intelligence::{IntelligentFileAnalyzer, InsightSeverity};
+use intelligence::{InsightSeverity, IntelligentFileAnalyzer};
 
 /// Global execution context carrying user preferences
 #[derive(Debug, Clone)]
@@ -30,51 +30,51 @@ impl RuneContext {
             yes: args.yes,
         }
     }
-    
+
     /// Print message only if not in quiet mode
     fn info(&self, message: &str) {
         if !self.quiet {
             Style::info(message);
         }
     }
-    
+
     /// Print verbose message only if verbose mode is enabled
     fn verbose(&self, message: &str) {
         if self.verbose {
             Style::verbose(message);
         }
     }
-    
+
     /// Print warning message (always shown unless quiet)
     fn warning(&self, message: &str) {
         if !self.quiet {
             Style::warning(message);
         }
     }
-    
+
     /// Print error message (always shown)
     fn error(&self, message: &str) {
         Style::error(message);
     }
-    
+
     /// Ask for confirmation unless --yes flag is used
     fn confirm(&self, prompt: &str) -> Result<bool, Box<dyn std::error::Error>> {
         if self.yes {
             return Ok(true);
         }
-        
+
         if self.quiet {
             // In quiet mode without --yes, default to no for safety
             return Ok(false);
         }
-        
+
         print!("{} [y/N]: ", prompt);
         use std::io::{self, Write};
         io::stdout().flush()?;
-        
+
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
-        
+
         Ok(input.trim().to_lowercase().starts_with('y'))
     }
 }
@@ -85,15 +85,15 @@ struct Args {
     /// Enable verbose output with detailed information
     #[arg(short, long, global = true)]
     verbose: bool,
-    
+
     /// Suppress non-essential output (quiet mode)
     #[arg(short, long, global = true, conflicts_with = "verbose")]
     quiet: bool,
-    
+
     /// Assume yes for confirmation prompts (non-interactive mode)
     #[arg(short, long, global = true)]
     yes: bool,
-    
+
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -129,7 +129,11 @@ enum IgnoreCmd {
         pattern: String,
         #[arg(long, help = "Description for the rule")]
         description: Option<String>,
-        #[arg(long, help = "Priority level (higher takes precedence)", default_value = "50")]
+        #[arg(
+            long,
+            help = "Priority level (higher takes precedence)",
+            default_value = "50"
+        )]
         priority: i32,
         #[arg(long, help = "Add to global ignore file")]
         global: bool,
@@ -166,7 +170,9 @@ enum IgnoreCmd {
 enum DocsCmd {
     /// View a specific topic in the documentation
     View {
-        #[arg(help = "Topic to view (getting-started, commands, migration, best-practices, troubleshooting)")]
+        #[arg(
+            help = "Topic to view (getting-started, commands, migration, best-practices, troubleshooting)"
+        )]
         topic: String,
     },
     /// Search documentation content
@@ -189,7 +195,9 @@ enum DocsCmd {
 enum ExamplesCmd {
     /// View examples for a specific category
     Category {
-        #[arg(help = "Category to view (basic, branching, remote, ignore, files, workflow, migration, troubleshooting)")]
+        #[arg(
+            help = "Category to view (basic, branching, remote, ignore, files, workflow, migration, troubleshooting)"
+        )]
         name: String,
     },
     /// Search examples by keyword
@@ -574,9 +582,15 @@ enum ConfigCmd {
         dependencies: Option<bool>,
         #[arg(long, help = "Enable/disable predictive suggestions")]
         suggestions: Option<bool>,
-        #[arg(long, help = "Set analysis depth: minimal, standard, deep, comprehensive")]
+        #[arg(
+            long,
+            help = "Set analysis depth: minimal, standard, deep, comprehensive"
+        )]
         depth: Option<String>,
-        #[arg(long, help = "Set notification level: silent, errors, warnings, info, detailed")]
+        #[arg(
+            long,
+            help = "Set notification level: silent, errors, warnings, info, detailed"
+        )]
         notifications: Option<String>,
     },
     /// Analyze repository health and get insights
@@ -594,19 +608,17 @@ fn author() -> rune_core::Author {
 
 fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
     match cmd {
-        ConfigCmd::Get { key } => {
-            match key.as_str() {
-                "intelligence.enabled" => {
-                    let enabled = std::env::var("RUNE_INTELLIGENCE").unwrap_or_default() != "false";
-                    println!("{}", enabled);
-                },
-                "intelligence.notifications" => {
-                    let level = std::env::var("RUNE_INTELLIGENCE_NOTIFICATIONS").unwrap_or_default();
-                    println!("{}", if level.is_empty() { "info" } else { &level });
-                },
-                _ => {
-                    Style::error(&format!("Unknown configuration key: {}", key));
-                }
+        ConfigCmd::Get { key } => match key.as_str() {
+            "intelligence.enabled" => {
+                let enabled = std::env::var("RUNE_INTELLIGENCE").unwrap_or_default() != "false";
+                println!("{}", enabled);
+            }
+            "intelligence.notifications" => {
+                let level = std::env::var("RUNE_INTELLIGENCE_NOTIFICATIONS").unwrap_or_default();
+                println!("{}", if level.is_empty() { "info" } else { &level });
+            }
+            _ => {
+                Style::error(&format!("Unknown configuration key: {}", key));
             }
         },
         ConfigCmd::Set { key, value } => {
@@ -615,34 +627,50 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
             Style::info("Use environment variables for now:");
             Style::info("  RUNE_INTELLIGENCE=true|false");
             Style::info("  RUNE_INTELLIGENCE_NOTIFICATIONS=silent|errors|warnings|info|detailed");
-        },
+        }
         ConfigCmd::List => {
             Style::section_header("Rune Configuration");
             println!("\n{}", "Intelligence Settings:".bold());
-            
-            let intelligence_enabled = std::env::var("RUNE_INTELLIGENCE").unwrap_or_default() != "false";
-            println!("  intelligence.enabled = {}", 
-                    if intelligence_enabled { "true".green() } else { "false".red() });
-            
-            let notifications = std::env::var("RUNE_INTELLIGENCE_NOTIFICATIONS").unwrap_or("info".to_string());
+
+            let intelligence_enabled =
+                std::env::var("RUNE_INTELLIGENCE").unwrap_or_default() != "false";
+            println!(
+                "  intelligence.enabled = {}",
+                if intelligence_enabled {
+                    "true".green()
+                } else {
+                    "false".red()
+                }
+            );
+
+            let notifications =
+                std::env::var("RUNE_INTELLIGENCE_NOTIFICATIONS").unwrap_or("info".to_string());
             println!("  intelligence.notifications = {}", notifications.cyan());
-            
+
             println!("\n{}", "Environment Variables:".bold());
-            println!("  RUNE_INTELLIGENCE = {}", 
-                    std::env::var("RUNE_INTELLIGENCE").unwrap_or("(not set)".to_string()).yellow());
-            println!("  RUNE_INTELLIGENCE_NOTIFICATIONS = {}", 
-                    std::env::var("RUNE_INTELLIGENCE_NOTIFICATIONS").unwrap_or("(not set)".to_string()).yellow());
-        },
+            println!(
+                "  RUNE_INTELLIGENCE = {}",
+                std::env::var("RUNE_INTELLIGENCE")
+                    .unwrap_or("(not set)".to_string())
+                    .yellow()
+            );
+            println!(
+                "  RUNE_INTELLIGENCE_NOTIFICATIONS = {}",
+                std::env::var("RUNE_INTELLIGENCE_NOTIFICATIONS")
+                    .unwrap_or("(not set)".to_string())
+                    .yellow()
+            );
+        }
         ConfigCmd::Intelligence => {
             let mut analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Intelligence Configuration");
-            
+
             println!("\n{}", "Current Settings:".bold());
             println!("  Status: {}", "Active".green());
             println!("  Features: {}", "All enabled".green());
             println!("  Analysis Depth: {}", "Standard".cyan());
             println!("  Notifications: {}", "Info level".cyan());
-            
+
             println!("\n{}", "Available Features:".bold());
             println!("  🔐 Security Analysis - Detect credentials, security risks");
             println!("  ⚡ Performance Optimization - Storage and compression insights");
@@ -651,12 +679,12 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
             println!("  🎯 Predictive Suggestions - Smart recommendations");
             println!("  🗜️  Advanced Compression - Intelligent file compression");
             println!("  🚫 Conflict Prevention - Proactive merge conflict detection");
-            
+
             println!("\n{}", "Usage:".bold());
             println!("  rune config intelligence-set --security true --performance true");
             println!("  rune config intelligence-set --depth comprehensive");
             println!("  rune config intelligence-set --notifications detailed");
-            
+
             // Show a sample analysis
             println!("\n{}", "Sample Analysis:".bold());
             if let Ok(current_dir) = std::env::current_dir() {
@@ -675,27 +703,68 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
                     }
                 }
             }
-        },
-        ConfigCmd::IntelligenceSet { 
-            security, performance, quality, dependencies, suggestions, depth, notifications 
+        }
+        ConfigCmd::IntelligenceSet {
+            security,
+            performance,
+            quality,
+            dependencies,
+            suggestions,
+            depth,
+            notifications,
         } => {
             Style::section_header("Configuring Intelligence Features");
-            
+
             // For now, just show what would be configured
             if let Some(sec) = security {
-                println!("  Security Analysis: {}", if sec { "enabled".green() } else { "disabled".red() });
+                println!(
+                    "  Security Analysis: {}",
+                    if sec {
+                        "enabled".green()
+                    } else {
+                        "disabled".red()
+                    }
+                );
             }
             if let Some(perf) = performance {
-                println!("  Performance Optimization: {}", if perf { "enabled".green() } else { "disabled".red() });
+                println!(
+                    "  Performance Optimization: {}",
+                    if perf {
+                        "enabled".green()
+                    } else {
+                        "disabled".red()
+                    }
+                );
             }
             if let Some(qual) = quality {
-                println!("  Code Quality Assessment: {}", if qual { "enabled".green() } else { "disabled".red() });
+                println!(
+                    "  Code Quality Assessment: {}",
+                    if qual {
+                        "enabled".green()
+                    } else {
+                        "disabled".red()
+                    }
+                );
             }
             if let Some(deps) = dependencies {
-                println!("  Dependency Analysis: {}", if deps { "enabled".green() } else { "disabled".red() });
+                println!(
+                    "  Dependency Analysis: {}",
+                    if deps {
+                        "enabled".green()
+                    } else {
+                        "disabled".red()
+                    }
+                );
             }
             if let Some(sugg) = suggestions {
-                println!("  Predictive Suggestions: {}", if sugg { "enabled".green() } else { "disabled".red() });
+                println!(
+                    "  Predictive Suggestions: {}",
+                    if sugg {
+                        "enabled".green()
+                    } else {
+                        "disabled".red()
+                    }
+                );
             }
             if let Some(d) = depth {
                 println!("  Analysis Depth: {}", d.cyan());
@@ -703,33 +772,40 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
             if let Some(n) = notifications {
                 println!("  Notification Level: {}", n.cyan());
             }
-            
+
             Style::warning("Persistent configuration storage not yet implemented");
             Style::info("Configuration will apply for this session only");
             Style::info("Use environment variables for persistent settings");
-        },
+        }
         ConfigCmd::Health => {
             let mut analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Repository Health Analysis");
-            
+
             match std::env::current_dir() {
                 Ok(current_dir) => {
                     let insights = analyzer.analyze_repository(&current_dir)?;
-                    
+
                     println!("\n{}", "Repository Health Report".bold());
-                    println!("  🎯 Overall Score: {:.1}/100 {}", 
-                            insights.quality_score,
-                            if insights.quality_score > 80.0 { "🟢".green() } 
-                            else if insights.quality_score > 60.0 { "🟡".yellow() } 
-                            else { "🔴".red() });
-                    
+                    println!(
+                        "  🎯 Overall Score: {:.1}/100 {}",
+                        insights.quality_score,
+                        if insights.quality_score > 80.0 {
+                            "🟢".green()
+                        } else if insights.quality_score > 60.0 {
+                            "🟡".yellow()
+                        } else {
+                            "🔴".red()
+                        }
+                    );
+
                     if !insights.health_indicators.is_empty() {
                         println!("\n{}", "Health Indicators".bold());
                         for indicator in &insights.health_indicators {
-                            println!("  {} {}: {}", 
+                            println!(
+                                "  {} {}: {}",
                                 match indicator.status {
                                     crate::intelligence::HealthStatus::Excellent => "✅",
-                                    crate::intelligence::HealthStatus::Good => "🟢", 
+                                    crate::intelligence::HealthStatus::Good => "🟢",
                                     crate::intelligence::HealthStatus::Warning => "⚠️",
                                     crate::intelligence::HealthStatus::Critical => "🔴",
                                 },
@@ -738,55 +814,66 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
                             );
                         }
                     }
-                    
+
                     if !insights.optimization_suggestions.is_empty() {
                         println!("\n{}", "Optimization Suggestions".bold());
                         for suggestion in insights.optimization_suggestions.iter().take(3) {
-                            println!("  💡 [Impact: {:.1}] {}", suggestion.impact_score, suggestion.suggestion);
+                            println!(
+                                "  💡 [Impact: {:.1}] {}",
+                                suggestion.impact_score, suggestion.suggestion
+                            );
                         }
                     }
-                    
+
                     if insights.quality_score < 70.0 {
                         println!("\n{}", "Tip".bold());
                         println!("  Run 'rune intelligence predict' for more specific improvement suggestions");
                     }
-                },
+                }
                 Err(e) => Style::error(&format!("Failed to get current directory: {}", e)),
             }
-        },
+        }
         ConfigCmd::Insights => {
             let mut analyzer = IntelligentFileAnalyzer::new();
             Style::section_header("Predictive Repository Insights");
-            
+
             match std::env::current_dir() {
                 Ok(current_dir) => {
                     let predictions = analyzer.generate_predictive_insights(&current_dir);
-                    
+
                     if predictions.is_empty() {
-                        println!("\n🎉 {} No potential issues detected!", "Excellent!".green().bold());
+                        println!(
+                            "\n🎉 {} No potential issues detected!",
+                            "Excellent!".green().bold()
+                        );
                         println!("Your repository appears to be well-maintained.");
                     } else {
                         println!("\n{} {} insights found:", "🔮".blue(), predictions.len());
-                        
+
                         for (i, insight) in predictions.iter().enumerate() {
                             let severity_icon = match insight.severity {
                                 crate::intelligence::InsightSeverity::High => "⚠️",
                                 crate::intelligence::InsightSeverity::Medium => "⚡",
                             };
-                            
-                            println!("\n{}. {} {} (Confidence: {:.0}%)",
-                                    i + 1, severity_icon, insight.insight.bold(), insight.confidence * 100.0);
+
+                            println!(
+                                "\n{}. {} {} (Confidence: {:.0}%)",
+                                i + 1,
+                                severity_icon,
+                                insight.insight.bold(),
+                                insight.confidence * 100.0
+                            );
                             println!("   Category: {:?}", insight.category);
                         }
-                        
+
                         println!("\n{}", "Next Steps".bold());
                         println!("  Address high-severity issues first");
                         println!("  Run 'rune config health' to track improvements");
                     }
-                },
+                }
                 Err(e) => Style::error(&format!("Failed to get current directory: {}", e)),
             }
-        },
+        }
     }
     Ok(())
 }
@@ -794,14 +881,18 @@ fn handle_config_command(cmd: ConfigCmd) -> anyhow::Result<()> {
 /// Verify installation and system requirements
 async fn doctor_check() -> anyhow::Result<()> {
     Style::section_header("🩺 Rune Installation Doctor");
-    
+
     // Check Rune version
     let version = env!("CARGO_PKG_VERSION");
-    println!("\n{} Rune version: {}", "✓".green(), Style::commit_hash(version));
-    
+    println!(
+        "\n{} Rune version: {}",
+        "✓".green(),
+        Style::commit_hash(version)
+    );
+
     // Check system requirements
     println!("\n{}", "System Requirements:".bold());
-    
+
     // Check Git availability (for migration purposes)
     match std::process::Command::new("git").arg("--version").output() {
         Ok(output) if output.status.success() => {
@@ -809,20 +900,27 @@ async fn doctor_check() -> anyhow::Result<()> {
             println!("{} Git found: {}", "✓".green(), git_version.trim());
         }
         _ => {
-            println!("{} Git not found (optional, needed for migration)", "⚠".yellow());
+            println!(
+                "{} Git not found (optional, needed for migration)",
+                "⚠".yellow()
+            );
         }
     }
-    
+
     // Check disk space in current directory
     match std::env::current_dir() {
         Ok(dir) => {
-            println!("{} Working directory: {}", "✓".green(), Style::file_path(&dir.display().to_string()));
+            println!(
+                "{} Working directory: {}",
+                "✓".green(),
+                Style::file_path(&dir.display().to_string())
+            );
         }
         Err(e) => {
             println!("{} Cannot access current directory: {}", "✗".red(), e);
         }
     }
-    
+
     // Check write permissions
     let temp_file = std::env::temp_dir().join("rune_doctor_test");
     match std::fs::write(&temp_file, "test") {
@@ -834,7 +932,7 @@ async fn doctor_check() -> anyhow::Result<()> {
             println!("{} Write permissions: Failed ({})", "✗".red(), e);
         }
     }
-    
+
     // Check if in a Rune repository
     match Store::discover(std::env::current_dir()?) {
         Ok(_) => {
@@ -844,7 +942,7 @@ async fn doctor_check() -> anyhow::Result<()> {
             println!("{} Rune repository: Not in a repository", "ℹ".blue());
         }
     }
-    
+
     println!("\n{} Installation verification complete!", "🎉".green());
     Ok(())
 }
@@ -852,10 +950,14 @@ async fn doctor_check() -> anyhow::Result<()> {
 /// Update Rune to the latest version
 async fn update_rune(dry_run: bool) -> anyhow::Result<()> {
     Style::section_header("🔄 Rune Update System");
-    
+
     let current_version = env!("CARGO_PKG_VERSION");
-    println!("\n{} Current version: {}", "ℹ".blue(), Style::commit_hash(current_version));
-    
+    println!(
+        "\n{} Current version: {}",
+        "ℹ".blue(),
+        Style::commit_hash(current_version)
+    );
+
     if dry_run {
         Style::info("🔍 Checking for updates...");
         Style::info("Update checking would be performed here");
@@ -863,7 +965,7 @@ async fn update_rune(dry_run: bool) -> anyhow::Result<()> {
         Style::info("No actual updates performed (--dry-run mode)");
         return Ok(());
     }
-    
+
     Style::warning("🚧 Auto-update system not yet implemented");
     println!("\n{}", "Manual update instructions:".bold());
     println!("  1. Visit: https://github.com/CaptainOtto/rune-vcs/releases");
@@ -873,27 +975,35 @@ async fn update_rune(dry_run: bool) -> anyhow::Result<()> {
     println!("  • macOS: brew upgrade rune");
     println!("  • Windows: scoop update rune");
     println!("  • Cargo: cargo install rune-vcs --force");
-    
+
     Ok(())
 }
 
 /// Print detailed version information
 fn print_version_info() {
     Style::section_header("📋 Rune Version Information");
-    
-    println!("\n{} Version: {}", "🔹".blue(), Style::commit_hash(env!("CARGO_PKG_VERSION")));
+
+    println!(
+        "\n{} Version: {}",
+        "🔹".blue(),
+        Style::commit_hash(env!("CARGO_PKG_VERSION"))
+    );
     println!("{} Package: {}", "🔹".blue(), env!("CARGO_PKG_NAME"));
-    
+
     // Use available Cargo environment variables
     #[cfg(debug_assertions)]
     println!("{} Profile: Debug", "🔹".blue());
     #[cfg(not(debug_assertions))]
     println!("{} Profile: Release", "🔹".blue());
-    
+
     println!("\n{}", "Repository Information:".bold());
-    println!("{} Homepage: {}", "🔗".blue(), "https://github.com/CaptainOtto/rune-vcs");
+    println!(
+        "{} Homepage: {}",
+        "🔗".blue(),
+        "https://github.com/CaptainOtto/rune-vcs"
+    );
     println!("{} License: {}", "📄".blue(), "Apache-2.0");
-    
+
     println!("\n{}", "Features:".bold());
     println!("{} VCS Operations: ✅", "⚡".yellow());
     println!("{} Branch Management: ✅", "🌿".green());
@@ -904,23 +1014,32 @@ fn print_version_info() {
 }
 
 /// Clone a remote repository
-async fn clone_repository(url: &str, directory: Option<&std::path::PathBuf>, ctx: &RuneContext) -> anyhow::Result<()> {
+async fn clone_repository(
+    url: &str,
+    directory: Option<&std::path::PathBuf>,
+    ctx: &RuneContext,
+) -> anyhow::Result<()> {
     ctx.info("📥 Cloning Repository");
-    
+
     let target_dir = if let Some(dir) = directory {
         dir.clone()
     } else {
         // Extract repository name from URL
-        let repo_name = url.split('/').last()
+        let repo_name = url
+            .split('/')
+            .last()
             .unwrap_or("repository")
             .trim_end_matches(".git");
         std::path::PathBuf::from(repo_name)
     };
-    
+
     ctx.info(&format!("🔗 Repository: {}", Style::commit_hash(url)));
-    ctx.info(&format!("📁 Target: {}", Style::file_path(&target_dir.display().to_string())));
+    ctx.info(&format!(
+        "📁 Target: {}",
+        Style::file_path(&target_dir.display().to_string())
+    ));
     ctx.verbose(&format!("Clone operation starting for: {}", url));
-    
+
     // For now, this is a simplified implementation
     // In a real implementation, this would handle various protocols (HTTP, SSH, file://)
     if url.starts_with("http://") || url.starts_with("https://") {
@@ -955,79 +1074,93 @@ async fn clone_repository(url: &str, directory: Option<&std::path::PathBuf>, ctx
         }
         return Err(anyhow::anyhow!("Unsupported URL format"));
     }
-    
+
     Ok(())
 }
 
 /// Clone a local repository (file:// or local path)
-async fn clone_local_repository(source: &str, target: &std::path::PathBuf, ctx: &RuneContext) -> anyhow::Result<()> {
+async fn clone_local_repository(
+    source: &str,
+    target: &std::path::PathBuf,
+    ctx: &RuneContext,
+) -> anyhow::Result<()> {
     let source_path = if source.starts_with("file://") {
         std::path::PathBuf::from(&source[7..]) // Remove "file://" prefix
     } else {
         std::path::PathBuf::from(source)
     };
-    
+
     // Check if source exists and is a rune repository
     let source_rune_dir = source_path.join(".rune");
     if !source_rune_dir.exists() {
         return Err(anyhow::anyhow!("Source is not a Rune repository"));
     }
-    
+
     // Create target directory
     std::fs::create_dir_all(target)?;
-    
-    ctx.verbose(&format!("Cloning from {} to {}", source_path.display(), target.display()));
-    
+
+    ctx.verbose(&format!(
+        "Cloning from {} to {}",
+        source_path.display(),
+        target.display()
+    ));
+
     // Show progress for repository structure copy
     Style::progress("Copying repository structure");
-    
+
     // Copy .rune directory
     copy_dir_all(&source_rune_dir, &target.join(".rune"))?;
-    
+
     Style::clear_progress();
     ctx.info("📋 Repository structure copied");
-    
+
     // Show progress for working directory copy
     Style::progress("Copying working directory files");
     ctx.verbose("Scanning source directory for files to copy");
-    
+
     // Copy working directory files (skip .rune)
     let mut file_count = 0;
     for entry in std::fs::read_dir(&source_path)? {
         let entry = entry?;
         let file_name = entry.file_name();
-        
+
         if file_name == ".rune" {
             continue; // Already copied
         }
-        
+
         let source_item = entry.path();
         let target_item = target.join(&file_name);
-        
+
         file_count += 1;
         ctx.verbose(&format!("Copying: {}", file_name.to_string_lossy()));
-        
+
         if source_item.is_dir() {
             copy_dir_all(&source_item, &target_item)?;
         } else {
             std::fs::copy(&source_item, &target_item)?;
         }
     }
-    
+
     Style::clear_progress();
     Style::success("✅ Repository cloned successfully");
-    ctx.info(&format!("📁 Cloned to: {}", Style::file_path(&target.display().to_string())));
+    ctx.info(&format!(
+        "📁 Cloned to: {}",
+        Style::file_path(&target.display().to_string())
+    ));
     ctx.verbose(&format!("Copied {} files/directories", file_count));
-    
+
     // Verify the clone
     ctx.verbose("Verifying cloned repository");
     let store = Store::open(target)?;
     let log = store.log();
     if !log.is_empty() {
         ctx.info(&format!("📊 Commits: {}", log.len()));
-        ctx.info(&format!("🔸 Latest: {}", Style::commit_hash(&log[0].id[..8])));
+        ctx.info(&format!(
+            "🔸 Latest: {}",
+            Style::commit_hash(&log[0].id[..8])
+        ));
     }
-    
+
     Ok(())
 }
 
@@ -1049,14 +1182,14 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> anyhow::Result<
 /// Fetch changes from a remote repository
 async fn fetch_from_remote(remote: &str) -> anyhow::Result<()> {
     Style::section_header("📥 Fetching from Remote");
-    
+
     let s = Store::discover(std::env::current_dir()?)?;
-    
+
     println!("\n{} Remote: {}", "🔗".blue(), Style::branch_name(remote));
-    
+
     // Check if we're in a repository
     let _log = s.log(); // This will verify we're in a repo
-    
+
     Style::warning("🚧 Remote fetching not yet implemented");
     Style::info("Planned features:");
     Style::info("  • Fetch remote refs and objects");
@@ -1064,85 +1197,95 @@ async fn fetch_from_remote(remote: &str) -> anyhow::Result<()> {
     Style::info("  • Conflict detection and resolution");
     Style::info("  • Progress reporting for large transfers");
     Style::info("  • Delta compression optimization");
-    
+
     // Simulate fetch operation
     Style::info("📡 Connecting to remote...");
     Style::info("🔄 Fetching refs...");
     Style::info("📦 Downloading objects...");
     Style::success("✅ Fetch completed (simulated)");
-    
+
     Ok(())
 }
 
 /// Pull changes from a remote repository
 async fn pull_from_remote(remote: &str, branch: &str) -> anyhow::Result<()> {
     Style::section_header("📥 Pulling from Remote");
-    
+
     let s = Store::discover(std::env::current_dir()?)?;
-    
+
     println!("\n{} Remote: {}", "🔗".blue(), Style::branch_name(remote));
     println!("{} Branch: {}", "🌿".green(), Style::branch_name(branch));
-    
+
     // Check current branch
     let current_branch = s.head_ref();
-    println!("{} Current: {}", "📍".yellow(), Style::branch_name(&current_branch));
-    
+    println!(
+        "{} Current: {}",
+        "📍".yellow(),
+        Style::branch_name(&current_branch)
+    );
+
     Style::warning("🚧 Remote pulling not yet implemented");
     Style::info("Pull operation would:");
     Style::info("  1. Fetch changes from remote");
     Style::info("  2. Merge remote branch into current branch");
     Style::info("  3. Update working directory");
     Style::info("  4. Handle merge conflicts if any");
-    
+
     // For now, suggest manual workflow
     Style::info("Manual workflow:");
     Style::info(&format!("  rune fetch {}", remote));
     Style::info(&format!("  rune merge {}/{}", remote, branch));
-    
+
     Ok(())
 }
 
 /// Push changes to a remote repository
 async fn push_to_remote(remote: &str, branch: &str) -> anyhow::Result<()> {
     Style::section_header("📤 Pushing to Remote");
-    
+
     let s = Store::discover(std::env::current_dir()?)?;
-    
+
     println!("\n{} Remote: {}", "🔗".blue(), Style::branch_name(remote));
     println!("{} Branch: {}", "🌿".green(), Style::branch_name(branch));
-    
+
     // Show what would be pushed
     let log = s.log();
     if log.is_empty() {
         Style::warning("⚠️  No commits to push");
         return Ok(());
     }
-    
-    println!("{} Latest commit: {}", "📊".blue(), Style::commit_hash(&log[0].id[..8]));
+
+    println!(
+        "{} Latest commit: {}",
+        "📊".blue(),
+        Style::commit_hash(&log[0].id[..8])
+    );
     println!("{} Total commits: {}", "📈".blue(), log.len());
-    
+
     Style::warning("🚧 Remote pushing not yet implemented");
     Style::info("Push operation would:");
     Style::info("  1. Compare local and remote refs");
     Style::info("  2. Upload missing objects and commits");
     Style::info("  3. Update remote refs");
     Style::info("  4. Handle push conflicts");
-    
+
     // Simulate push validation
     Style::info("🔍 Validating local commits...");
     for (i, commit) in log.iter().take(3).enumerate() {
-        println!("  {} {} - {}", 
-                if i == 0 { "📌" } else { "📋" },
-                &commit.id[..8], 
-                commit.message);
+        println!(
+            "  {} {} - {}",
+            if i == 0 { "📌" } else { "📋" },
+            &commit.id[..8],
+            commit.message
+        );
     }
     if log.len() > 3 {
         println!("  ... and {} more commits", log.len() - 3);
     }
-    
+
     Style::success("✅ Push validation completed (simulated)");
     Style::info("Use --dry-run flag to see what would be pushed");
-    
+
     Ok(())
 }
 
@@ -1151,50 +1294,80 @@ async fn handle_ignore_command(cmd: IgnoreCmd, ctx: &RuneContext) -> anyhow::Res
     match cmd {
         IgnoreCmd::Check { files, debug } => {
             ctx.info("🔍 Checking ignore status");
-            
-            let mut engine = IgnoreEngine::new(std::env::current_dir().context("Failed to get current directory")?).context("Failed to initialize ignore engine")?;
-            
+
+            let mut engine = IgnoreEngine::new(
+                std::env::current_dir().context("Failed to get current directory")?,
+            )
+            .context("Failed to initialize ignore engine")?;
+
             for file in &files {
                 let should_ignore = engine.should_ignore(file);
-                let status = if should_ignore { "❌ IGNORED" } else { "✅ TRACKED" };
-                
+                let status = if should_ignore {
+                    "❌ IGNORED"
+                } else {
+                    "✅ TRACKED"
+                };
+
                 if debug {
                     let debug_info = engine.debug_path(file);
-                    println!("\n{} {}: {}", 
-                        "📁".blue(), 
-                        Style::file_path(&file.display().to_string()), 
-                        status);
-                    
+                    println!(
+                        "\n{} {}: {}",
+                        "📁".blue(),
+                        Style::file_path(&file.display().to_string()),
+                        status
+                    );
+
                     if !debug_info.matched_rules.is_empty() {
                         println!("  📋 Matched Rules:");
                         for rule_match in &debug_info.matched_rules {
-                            println!("    {} {} (priority: {}) - {}", 
+                            println!(
+                                "    {} {} (priority: {}) - {}",
                                 "🔸".yellow(),
                                 rule_match.rule.pattern,
                                 rule_match.rule.priority,
-                                rule_match.rule.description.as_deref().unwrap_or("No description"));
+                                rule_match
+                                    .rule
+                                    .description
+                                    .as_deref()
+                                    .unwrap_or("No description")
+                            );
                         }
                     }
-                    
+
                     if let Some(decision_rule) = &debug_info.decision_rule {
-                        println!("  🎯 Final Decision: {} - {}", 
+                        println!(
+                            "  🎯 Final Decision: {} - {}",
                             decision_rule.rule.pattern,
-                            decision_rule.rule.description.as_deref().unwrap_or("No description"));
+                            decision_rule
+                                .rule
+                                .description
+                                .as_deref()
+                                .unwrap_or("No description")
+                        );
                     }
                 } else {
-                    println!("{} {}: {}", 
-                        "📁".blue(), 
-                        Style::file_path(&file.display().to_string()), 
-                        status);
+                    println!(
+                        "{} {}: {}",
+                        "📁".blue(),
+                        Style::file_path(&file.display().to_string()),
+                        status
+                    );
                 }
             }
         }
-        
-        IgnoreCmd::Add { pattern, description, priority, global } => {
+
+        IgnoreCmd::Add {
+            pattern,
+            description,
+            priority,
+            global,
+        } => {
             ctx.info(&format!("➕ Adding ignore pattern: {}", pattern));
-            
-            let mut engine = IgnoreEngine::new(std::env::current_dir().context("Failed to get current directory")?)?;
-            
+
+            let mut engine = IgnoreEngine::new(
+                std::env::current_dir().context("Failed to get current directory")?,
+            )?;
+
             let rule = IgnoreRule {
                 pattern: pattern.clone(),
                 rule_type: RuleType::Ignore,
@@ -1202,41 +1375,54 @@ async fn handle_ignore_command(cmd: IgnoreCmd, ctx: &RuneContext) -> anyhow::Res
                 description,
                 condition: None,
             };
-            
+
             engine.add_rule(rule);
             engine.save_config()?;
-            
+
             let scope = if global { "global" } else { "project" };
-            Style::success(&format!("✅ Added ignore pattern '{}' to {} configuration", pattern, scope));
+            Style::success(&format!(
+                "✅ Added ignore pattern '{}' to {} configuration",
+                pattern, scope
+            ));
         }
-        
-        IgnoreCmd::List { global, project, templates } => {
-            let engine = IgnoreEngine::new(std::env::current_dir().context("Failed to get current directory")?)?;
-            
+
+        IgnoreCmd::List {
+            global,
+            project,
+            templates,
+        } => {
+            let engine = IgnoreEngine::new(
+                std::env::current_dir().context("Failed to get current directory")?,
+            )?;
+
             if global || (!project && !templates) {
                 ctx.info("🌍 Global Ignore Rules:");
                 for rule in engine.get_global_rules() {
-                    println!("  {} {} (priority: {}) - {}", 
+                    println!(
+                        "  {} {} (priority: {}) - {}",
                         "🔸".yellow(),
                         rule.pattern,
                         rule.priority,
-                        rule.description.as_deref().unwrap_or("No description"));
+                        rule.description.as_deref().unwrap_or("No description")
+                    );
                 }
                 println!();
             }
-            
+
             if project || (!global && !templates) {
                 ctx.info("📁 Project Ignore Rules:");
                 for rule in engine.get_project_rules() {
-                    println!("  {} {} (priority: {}) - {}", 
+                    println!(
+                        "  {} {} (priority: {}) - {}",
                         "🔸".blue(),
                         rule.pattern,
                         rule.priority,
-                        rule.description.as_deref().unwrap_or("No description"));
+                        rule.description.as_deref().unwrap_or("No description")
+                    );
                 }
                 println!();
             }
-            
+
             if templates || (!global && !project) {
                 ctx.info("📋 Active Templates:");
                 for template in engine.get_active_templates() {
@@ -1244,47 +1430,60 @@ async fn handle_ignore_command(cmd: IgnoreCmd, ctx: &RuneContext) -> anyhow::Res
                 }
             }
         }
-        
+
         IgnoreCmd::Templates => {
             ctx.info("📋 Available Project Templates:");
-            
+
             let templates = vec![
                 ("rust", "Rust projects (Cargo.toml, target/, *.rs)"),
-                ("node", "Node.js projects (package.json, node_modules/, npm logs)"),
+                (
+                    "node",
+                    "Node.js projects (package.json, node_modules/, npm logs)",
+                ),
                 ("python", "Python projects (setup.py, __pycache__/, *.pyc)"),
-                ("java", "Java projects (pom.xml, build.gradle, target/, *.class)"),
+                (
+                    "java",
+                    "Java projects (pom.xml, build.gradle, target/, *.class)",
+                ),
                 ("dotnet", ".NET projects (*.csproj, bin/, obj/, *.suo)"),
             ];
-            
+
             for (name, description) in templates {
-                println!("  {} {} - {}", "🔸".blue(), Style::branch_name(name), description);
+                println!(
+                    "  {} {} - {}",
+                    "🔸".blue(),
+                    Style::branch_name(name),
+                    description
+                );
             }
-            
+
             ctx.info("💡 Templates are auto-detected and applied when project files are found");
         }
-        
+
         IgnoreCmd::Apply { template } => {
             ctx.info(&format!("📋 Applying template: {}", template));
             Style::warning("🚧 Manual template application not yet implemented");
             Style::info("Templates are automatically applied when project files are detected");
         }
-        
+
         IgnoreCmd::Init { force: _force } => {
             ctx.info("🚀 Initializing smart ignore configuration");
-            
-            let engine = IgnoreEngine::new(std::env::current_dir().context("Failed to get current directory")?)?;
+
+            let engine = IgnoreEngine::new(
+                std::env::current_dir().context("Failed to get current directory")?,
+            )?;
             engine.save_config()?;
-            
+
             Style::success("✅ Smart ignore configuration initialized");
             ctx.info("📋 Auto-detected project templates:");
             for template in engine.get_active_templates() {
                 println!("  {} {}", "✅".green(), template);
             }
         }
-        
+
         IgnoreCmd::Optimize { dry_run } => {
             ctx.info("🔧 Optimizing ignore rules");
-            
+
             if dry_run {
                 Style::info("🔍 DRY RUN - No changes will be made");
                 Style::info("Optimization analysis:");
@@ -1302,25 +1501,25 @@ async fn handle_ignore_command(cmd: IgnoreCmd, ctx: &RuneContext) -> anyhow::Res
             }
         }
     }
-    
+
     Ok(())
 }
 
 /// Handle documentation-related commands
 async fn handle_docs_command(cmd: DocsCmd, ctx: &RuneContext) -> anyhow::Result<()> {
     let docs_engine = DocsEngine::new()?;
-    
+
     match cmd {
         DocsCmd::View { topic } => {
             ctx.info(&format!("📖 Viewing documentation: {}", topic));
             let content = docs_engine.get_topic_content(&topic)?;
             println!("{}", content);
         }
-        
+
         DocsCmd::Search { query } => {
             ctx.info(&format!("🔍 Searching documentation for: {}", query));
             let results = docs_engine.search(&query);
-            
+
             if results.is_empty() {
                 Style::warning("No results found.");
             } else {
@@ -1334,10 +1533,13 @@ async fn handle_docs_command(cmd: DocsCmd, ctx: &RuneContext) -> anyhow::Result<
                 }
             }
         }
-        
+
         DocsCmd::Serve { addr, open } => {
-            ctx.info(&format!("🌐 Starting documentation server at http://{}", addr));
-            
+            ctx.info(&format!(
+                "🌐 Starting documentation server at http://{}",
+                addr
+            ));
+
             if open {
                 // Try to open the browser
                 let url = format!("http://{}", addr);
@@ -1347,10 +1549,10 @@ async fn handle_docs_command(cmd: DocsCmd, ctx: &RuneContext) -> anyhow::Result<
                     Style::success("Opening documentation in browser...");
                 }
             }
-            
+
             docs_engine.start_server(&addr).await?;
         }
-        
+
         DocsCmd::List => {
             ctx.info("📚 Available documentation topics:");
             let topics = vec![
@@ -1360,25 +1562,25 @@ async fn handle_docs_command(cmd: DocsCmd, ctx: &RuneContext) -> anyhow::Result<
                 ("best-practices", "Best practices and workflows"),
                 ("troubleshooting", "Common issues and solutions"),
             ];
-            
+
             for (topic, description) in topics {
                 println!("  {} {}", topic.bold().blue(), description);
             }
         }
     }
-    
+
     Ok(())
 }
 
 /// Handle examples-related commands
 async fn handle_examples_command(cmd: ExamplesCmd, ctx: &RuneContext) -> anyhow::Result<()> {
     let docs_engine = DocsEngine::new()?;
-    
+
     match cmd {
         ExamplesCmd::Category { name } => {
             ctx.info(&format!("📝 Examples for category: {}", name));
             let examples = docs_engine.get_examples_by_category(&name);
-            
+
             if examples.is_empty() {
                 Style::warning(&format!("No examples found for category: {}", name));
                 Style::info("Available categories: basic, branching, remote, ignore, files, workflow, migration, troubleshooting");
@@ -1395,11 +1597,11 @@ async fn handle_examples_command(cmd: ExamplesCmd, ctx: &RuneContext) -> anyhow:
                 }
             }
         }
-        
+
         ExamplesCmd::Search { query } => {
             ctx.info(&format!("🔍 Searching examples for: {}", query));
             let examples = docs_engine.search_examples(&query);
-            
+
             if examples.is_empty() {
                 Style::warning("No examples found.");
             } else {
@@ -1414,7 +1616,7 @@ async fn handle_examples_command(cmd: ExamplesCmd, ctx: &RuneContext) -> anyhow:
                 }
             }
         }
-        
+
         ExamplesCmd::Show { name } => {
             ctx.info(&format!("📋 Showing example: {}", name));
             if let Some(example) = docs_engine.get_example_by_name(&name) {
@@ -1429,7 +1631,7 @@ async fn handle_examples_command(cmd: ExamplesCmd, ctx: &RuneContext) -> anyhow:
                 Style::info("Use 'rune examples list' to see all available examples.");
             }
         }
-        
+
         ExamplesCmd::List { categories } => {
             if categories {
                 ctx.info("📂 Available example categories:");
@@ -1443,14 +1645,14 @@ async fn handle_examples_command(cmd: ExamplesCmd, ctx: &RuneContext) -> anyhow:
                     ("migration", "Migrating from other VCS"),
                     ("troubleshooting", "Problem solving examples"),
                 ];
-                
+
                 for (cat, desc) in categories {
                     println!("  {} {}", cat.bold().blue(), desc);
                 }
             } else {
                 ctx.info("📝 All available examples:");
                 let all_examples = docs_engine.get_all_examples();
-                
+
                 let mut current_category = String::new();
                 for example in all_examples {
                     if example.category != current_category {
@@ -1462,14 +1664,14 @@ async fn handle_examples_command(cmd: ExamplesCmd, ctx: &RuneContext) -> anyhow:
             }
         }
     }
-    
+
     Ok(())
 }
 
 /// Handle tutorial-related commands
 async fn handle_tutorial_command(cmd: TutorialCmd, ctx: &RuneContext) -> anyhow::Result<()> {
     let docs_engine = DocsEngine::new()?;
-    
+
     match cmd {
         TutorialCmd::Basics => {
             ctx.info("🎓 Starting Basics Tutorial");
@@ -1479,7 +1681,7 @@ async fn handle_tutorial_command(cmd: TutorialCmd, ctx: &RuneContext) -> anyhow:
                 Style::warning("Basics tutorial not found");
             }
         }
-        
+
         TutorialCmd::Branching => {
             ctx.info("🎓 Starting Branching Tutorial");
             if let Some(tutorial) = docs_engine.get_tutorial("branching") {
@@ -1488,7 +1690,7 @@ async fn handle_tutorial_command(cmd: TutorialCmd, ctx: &RuneContext) -> anyhow:
                 Style::warning("Branching tutorial not found");
             }
         }
-        
+
         TutorialCmd::Collaboration => {
             ctx.info("🎓 Starting Collaboration Tutorial");
             if let Some(tutorial) = docs_engine.get_tutorial("collaboration") {
@@ -1497,7 +1699,7 @@ async fn handle_tutorial_command(cmd: TutorialCmd, ctx: &RuneContext) -> anyhow:
                 Style::warning("Collaboration tutorial not found");
             }
         }
-        
+
         TutorialCmd::Advanced => {
             ctx.info("🎓 Starting Advanced Tutorial");
             if let Some(tutorial) = docs_engine.get_tutorial("advanced") {
@@ -1506,7 +1708,7 @@ async fn handle_tutorial_command(cmd: TutorialCmd, ctx: &RuneContext) -> anyhow:
                 Style::warning("Advanced tutorial not found");
             }
         }
-        
+
         TutorialCmd::List => {
             ctx.info("🎓 Available tutorials:");
             let tutorials = vec![
@@ -1515,14 +1717,14 @@ async fn handle_tutorial_command(cmd: TutorialCmd, ctx: &RuneContext) -> anyhow:
                 ("collaboration", "Team workflows and remote repositories"),
                 ("advanced", "Advanced features and optimization"),
             ];
-            
+
             for (tutorial, description) in tutorials {
                 println!("  {} {}", tutorial.bold().blue(), description);
             }
-            
+
             Style::info("\nStart a tutorial with: rune tutorial <name>");
         }
-        
+
         TutorialCmd::Resume { name } => {
             ctx.info(&format!("🔄 Resuming tutorial: {}", name));
             if let Some(tutorial) = docs_engine.get_tutorial(&name) {
@@ -1532,7 +1734,7 @@ async fn handle_tutorial_command(cmd: TutorialCmd, ctx: &RuneContext) -> anyhow:
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -1541,9 +1743,9 @@ async fn main() -> anyhow::Result<()> {
     init_colors();
     let args = Args::parse();
     let ctx = RuneContext::new(&args);
-    
+
     ctx.verbose("Rune VCS starting with enhanced user experience features");
-    
+
     match args.cmd {
         Cmd::Guide => {
             Style::section_header("Rune VCS Quick Start Guide");
@@ -1837,12 +2039,15 @@ async fn main() -> anyhow::Result<()> {
                 if s.branch_exists(&n) {
                     ctx.error(&format!("Branch '{}' already exists", n));
                     ctx.info("💡 Tip: Use one of these alternatives:");
-                    ctx.info(&format!("  rune checkout {}        # Switch to existing branch", n));
+                    ctx.info(&format!(
+                        "  rune checkout {}        # Switch to existing branch",
+                        n
+                    ));
                     ctx.info("  rune branch              # List all branches");
                     ctx.info("  rune branch new-name     # Create branch with different name");
                     return Err(anyhow::anyhow!("Branch already exists"));
                 }
-                
+
                 s.create_branch(&n)?;
                 Style::success(&format!("Created branch {}", Style::branch_name(&n)));
             } else {
@@ -1869,7 +2074,10 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     if branches.is_empty() {
                         Style::info("No branches found");
-                        Style::info(&format!("Current: {}", Style::branch_name(&current_branch_name)));
+                        Style::info(&format!(
+                            "Current: {}",
+                            Style::branch_name(&current_branch_name)
+                        ));
                     } else {
                         for branch in branches {
                             if branch == current_branch_name {
@@ -1884,7 +2092,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Cmd::Checkout { name } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            
+
             // Check if trying to checkout current branch
             if let Some(current) = s.current_branch() {
                 if current == name {
@@ -1892,7 +2100,7 @@ async fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
             }
-            
+
             // Attempt to checkout the branch
             match s.checkout_branch(&name) {
                 Ok(()) => {
@@ -1907,29 +2115,35 @@ async fn main() -> anyhow::Result<()> {
         }
         Cmd::Merge { branch, no_ff } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            
+
             // Check if branch exists
             if !s.branch_exists(&branch) {
                 Style::error(&format!("Branch '{}' does not exist", branch));
                 Style::info("Use 'rune branch' to see available branches");
                 return Err(anyhow::anyhow!("Merge failed"));
             }
-            
+
             // Check if trying to merge current branch into itself
             if let Some(current) = s.current_branch() {
                 if current == branch {
-                    Style::info(&format!("Already on branch {}", Style::branch_name(&branch)));
+                    Style::info(&format!(
+                        "Already on branch {}",
+                        Style::branch_name(&branch)
+                    ));
                     Style::info("Nothing to merge");
                     return Ok(());
                 }
             }
-            
+
             // Attempt to merge the branch
             match s.merge_branch(&branch, no_ff) {
                 Ok(()) => {
-                    Style::success(&format!("Merged branch {} into {}", 
-                        Style::branch_name(&branch), 
-                        Style::branch_name(&s.current_branch().unwrap_or_else(|| "main".to_string()))
+                    Style::success(&format!(
+                        "Merged branch {} into {}",
+                        Style::branch_name(&branch),
+                        Style::branch_name(
+                            &s.current_branch().unwrap_or_else(|| "main".to_string())
+                        )
                     ));
                 }
                 Err(e) => {
@@ -1984,18 +2198,27 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Cmd::Lfs(sub) => return commands::lfs::run(sub).await,
-        Cmd::Intelligence { cmd } => {
-            match cmd {
-                IntelligenceCmd::Analyze { path, detailed } => {
-                    return commands::intelligence::analyze_repository(path, detailed).map_err(|e| e.into());
-                }
-                IntelligenceCmd::Predict { path } => {
-                    return commands::intelligence::generate_predictions(path).map_err(|e| e.into());
-                }
-                IntelligenceCmd::File { path } => {
-                    return commands::intelligence::analyze_file(path).map_err(|e| e.into());
-                }
-                IntelligenceCmd::Config { 
+        Cmd::Intelligence { cmd } => match cmd {
+            IntelligenceCmd::Analyze { path, detailed } => {
+                return commands::intelligence::analyze_repository(path, detailed)
+                    .map_err(|e| e.into());
+            }
+            IntelligenceCmd::Predict { path } => {
+                return commands::intelligence::generate_predictions(path).map_err(|e| e.into());
+            }
+            IntelligenceCmd::File { path } => {
+                return commands::intelligence::analyze_file(path).map_err(|e| e.into());
+            }
+            IntelligenceCmd::Config {
+                enable,
+                lfs_threshold,
+                security,
+                performance,
+                predictive,
+                health,
+                quality,
+            } => {
+                return commands::intelligence::configure_intelligence(
                     enable,
                     lfs_threshold,
                     security,
@@ -2003,23 +2226,20 @@ async fn main() -> anyhow::Result<()> {
                     predictive,
                     health,
                     quality,
-                } => {
-                    return commands::intelligence::configure_intelligence(
-                        enable,
-                        lfs_threshold,
-                        security,
-                        performance,
-                        predictive,
-                        health,
-                        quality,
-                    ).map_err(|e| e.into());
-                }
-                IntelligenceCmd::Status => {
-                    return commands::intelligence::show_intelligence_status().map_err(|e| e.into());
-                }
+                )
+                .map_err(|e| e.into());
             }
-        }
-        Cmd::Rebase { target, interactive, onto, preserve_merges, autosquash } => {
+            IntelligenceCmd::Status => {
+                return commands::intelligence::show_intelligence_status().map_err(|e| e.into());
+            }
+        },
+        Cmd::Rebase {
+            target,
+            interactive,
+            onto,
+            preserve_merges,
+            autosquash,
+        } => {
             let options = commands::advanced::RebaseOptions {
                 interactive,
                 onto,
@@ -2028,7 +2248,13 @@ async fn main() -> anyhow::Result<()> {
             };
             return commands::advanced::interactive_rebase(target, options).map_err(|e| e.into());
         }
-        Cmd::CherryPick { commit, no_commit, edit, signoff, strategy } => {
+        Cmd::CherryPick {
+            commit,
+            no_commit,
+            edit,
+            signoff,
+            strategy,
+        } => {
             let options = commands::advanced::CherryPickOptions {
                 no_commit,
                 edit,
@@ -2040,52 +2266,49 @@ async fn main() -> anyhow::Result<()> {
         Cmd::CherryPickRange { start, end } => {
             return commands::advanced::cherry_pick_range(start, end).map_err(|e| e.into());
         }
-        Cmd::Submodule { cmd } => {
-            match cmd {
-                SubmoduleCmd::List => {
-                    commands::advanced::list_submodules()?;
-                }
-                SubmoduleCmd::Add { url, path, branch } => {
-                    commands::advanced::add_submodule(url, path, branch)?;
-                }
-                SubmoduleCmd::Update { recursive, init } => {
-                    commands::advanced::update_submodules(recursive, init)?;
-                }
-                SubmoduleCmd::Remove { path: _path } => {
-                    println!("{}", "🗑️  Submodule removal not yet implemented".yellow());
-                }
+        Cmd::Submodule { cmd } => match cmd {
+            SubmoduleCmd::List => {
+                commands::advanced::list_submodules()?;
             }
-        }
-        Cmd::Hooks { cmd } => {
-            match cmd {
-                HooksCmd::Install => {
-                    commands::advanced::install_hooks()?;
-                }
-                HooksCmd::List => {
-                    commands::advanced::list_hooks()?;
-                }
-                HooksCmd::Run { name } => {
-                    let context = std::collections::HashMap::new();
-                    commands::advanced::run_hook(name, context)?;
-                }
-                HooksCmd::Config { hook: _hook, enable: _enable } => {
-                    println!("{}", "⚙️  Hook configuration not yet implemented".yellow());
-                }
+            SubmoduleCmd::Add { url, path, branch } => {
+                commands::advanced::add_submodule(url, path, branch)?;
             }
-        }
-        Cmd::Sign { cmd } => {
-            match cmd {
-                SignCmd::Setup { key } => {
-                    commands::advanced::setup_gpg_signing(key)?;
-                }
-                SignCmd::Verify { commits } => {
-                    commands::advanced::verify_signatures(commits)?;
-                }
-                SignCmd::Commit { message, key } => {
-                    commands::advanced::create_signed_commit(message, key)?;
-                }
+            SubmoduleCmd::Update { recursive, init } => {
+                commands::advanced::update_submodules(recursive, init)?;
             }
-        }
+            SubmoduleCmd::Remove { path: _path } => {
+                println!("{}", "🗑️  Submodule removal not yet implemented".yellow());
+            }
+        },
+        Cmd::Hooks { cmd } => match cmd {
+            HooksCmd::Install => {
+                commands::advanced::install_hooks()?;
+            }
+            HooksCmd::List => {
+                commands::advanced::list_hooks()?;
+            }
+            HooksCmd::Run { name } => {
+                let context = std::collections::HashMap::new();
+                commands::advanced::run_hook(name, context)?;
+            }
+            HooksCmd::Config {
+                hook: _hook,
+                enable: _enable,
+            } => {
+                println!("{}", "⚙️  Hook configuration not yet implemented".yellow());
+            }
+        },
+        Cmd::Sign { cmd } => match cmd {
+            SignCmd::Setup { key } => {
+                commands::advanced::setup_gpg_signing(key)?;
+            }
+            SignCmd::Verify { commits } => {
+                commands::advanced::verify_signatures(commits)?;
+            }
+            SignCmd::Commit { message, key } => {
+                commands::advanced::create_signed_commit(message, key)?;
+            }
+        },
         Cmd::Shrine(sub) => match sub {
             commands::shrine::ShrineCmd::Serve { addr } => {
                 return commands::shrine::serve(addr).await
@@ -2114,14 +2337,14 @@ async fn main() -> anyhow::Result<()> {
             return Ok(());
         }
         Cmd::Delta(sub) => return commands::delta::run(sub),
-        
+
         Cmd::Config { cmd } => {
             handle_config_command(cmd)?;
         }
 
         Cmd::Diff { target } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            
+
             match s.diff(target.as_deref()) {
                 Ok(diff_output) => {
                     if diff_output.trim().is_empty() {
@@ -2139,11 +2362,13 @@ async fn main() -> anyhow::Result<()> {
 
         Cmd::Reset { files, hard } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            
+
             if hard {
                 ctx.warning("⚠️  WARNING: --hard flag will permanently discard changes in working directory!");
-                ctx.verbose("This operation cannot be undone. All uncommitted changes will be lost.");
-                
+                ctx.verbose(
+                    "This operation cannot be undone. All uncommitted changes will be lost.",
+                );
+
                 match ctx.confirm("Are you sure you want to continue?") {
                     Ok(true) => {
                         ctx.verbose("User confirmed destructive operation");
@@ -2159,9 +2384,15 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
-            ctx.verbose(&format!("Performing reset on {} files (hard={})", 
-                if files.is_empty() { "all".to_string() } else { files.len().to_string() }, 
-                hard));
+            ctx.verbose(&format!(
+                "Performing reset on {} files (hard={})",
+                if files.is_empty() {
+                    "all".to_string()
+                } else {
+                    files.len().to_string()
+                },
+                hard
+            ));
 
             match s.reset(&files, hard) {
                 Ok(()) => {
@@ -2172,12 +2403,16 @@ async fn main() -> anyhow::Result<()> {
                             Style::success("✅ Reset staging area");
                         }
                     } else {
-                        let file_list = files.iter()
+                        let file_list = files
+                            .iter()
                             .map(|f| f.to_string_lossy())
                             .collect::<Vec<_>>()
                             .join(", ");
                         if hard {
-                            Style::success(&format!("✅ Reset {} from staging and working directory", file_list));
+                            Style::success(&format!(
+                                "✅ Reset {} from staging and working directory",
+                                file_list
+                            ));
                         } else {
                             Style::success(&format!("✅ Reset {} from staging area", file_list));
                         }
@@ -2230,7 +2465,7 @@ async fn main() -> anyhow::Result<()> {
 
         Cmd::Show { commit } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            
+
             let commit_to_show = if commit == "HEAD" {
                 // Get the latest commit
                 let log = s.log();
@@ -2257,7 +2492,7 @@ async fn main() -> anyhow::Result<()> {
                     println!();
                     println!("    {}", commit_data.message);
                     println!();
-                    
+
                     if !commit_data.files.is_empty() {
                         println!("Files in this commit:");
                         for file in &commit_data.files {

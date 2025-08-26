@@ -5,6 +5,7 @@ Rune's revolutionary intelligent file locking system provides intelligent confli
 ## Overview
 
 Traditional version control systems struggle with:
+
 - **Binary file conflicts** that are impossible to merge
 - **Large asset management** without proper tracking
 - **Team coordination** on shared resources
@@ -12,6 +13,7 @@ Traditional version control systems struggle with:
 - **Cross-platform file handling** differences
 
 Rune's intelligent locking solves these problems with:
+
 - ✨ **Smart Project Detection** - Automatically detects your project type and configures optimal settings
 - 🔒 **Intelligent Lock Management** - Context-aware locking based on file types and usage patterns
 - 🎯 **Conflict Prevention** - Proactive detection and prevention of merge conflicts
@@ -21,33 +23,39 @@ Rune's intelligent locking solves these problems with:
 ## Supported Project Types
 
 ### Game Development
+
 - **Unreal Engine** (.uproject, .uasset, .umap files)
 - **Unity** (.unity, .prefab, .mat files)
 - **Godot** (.godot, .tscn files)
 - **General game assets** (models, textures, audio)
 
 ### Web Development
+
 - **React/Vue/Angular** (package.json, webpack configs)
 - **Node.js** projects with complex dependencies
 - **Build artifacts** and bundled assets
 
 ### Mobile Development
+
 - **iOS** (.xcodeproj, Swift files)
 - **Android** (build.gradle, APK files)
 - **Cross-platform** (Flutter, React Native)
 
 ### Data Science
+
 - **Jupyter Notebooks** (.ipynb files)
 - **Large datasets** (.csv, .parquet, .h5 files)
 - **Model artifacts** (.pkl, .joblib files)
 
 ### Design & Media
+
 - **Adobe Creative Suite** (.psd, .ai files)
 - **Sketch/Figma** design files
 - **Video production** assets
 - **3D modeling** files (.blend, .ma, .mb)
 
 ### Documentation
+
 - **Technical writing** projects
 - **Wiki and knowledge bases**
 - **Multi-format documentation**
@@ -55,6 +63,7 @@ Rune's intelligent locking solves these problems with:
 ## Getting Started
 
 ### 1. Auto-Detection
+
 ```bash
 # Detect your project type and enable intelligent features
 rune lock detect
@@ -67,6 +76,7 @@ rune lock detect
 ```
 
 ### 2. Basic Locking
+
 ```bash
 # Lock files with intelligent reasoning
 rune lock lock src/main.rs --reason development
@@ -78,6 +88,7 @@ rune lock status
 ```
 
 ### 3. File Analysis
+
 ```bash
 # Analyze files for lock recommendations
 rune lock analyze assets/character_model.fbx
@@ -93,6 +104,7 @@ rune lock analyze assets/character_model.fbx
 ```
 
 ### 4. LFS Recommendations
+
 ```bash
 # Get intelligent LFS suggestions
 rune lock lfs-suggestions
@@ -101,7 +113,7 @@ rune lock lfs-suggestions
 #   assets/textures/character_diffuse.png (15.2 MB)
 #   models/environment.fbx (67.8 MB)
 #   audio/background_music.wav (25.4 MB)
-# 
+#
 # Run 'git lfs track' for these files to improve performance
 ```
 
@@ -110,36 +122,45 @@ rune lock lfs-suggestions
 ### Smart Lock Reasons
 
 **Development Locks**
+
 ```bash
 rune lock lock src/ --reason development
 ```
+
 - Prevents conflicts during active development
 - Automatically released when switching branches (configurable)
 
 **Release Locks**
+
 ```bash
 rune lock lock config/production.json --reason release
 ```
+
 - Protects critical files during release preparation
 - Cleaned up automatically after release tagging
 
 **Conflict Prevention**
+
 ```bash
 rune lock lock shared/database_schema.sql --reason conflict
 ```
+
 - High-risk files that frequently cause merge conflicts
 - Remains locked until explicitly released
 
 **Large File Operations**
+
 ```bash
 rune lock lock data/training_set.csv --reason large
 ```
+
 - Prevents multiple users from modifying large files simultaneously
 - Suggests LFS tracking automatically
 
 ### Branch Management
 
 **Automatic Cleanup on Branch Switch**
+
 ```bash
 # Lock files on feature branch
 rune lock lock components/new_feature.tsx --reason development
@@ -151,6 +172,7 @@ git checkout main
 ```
 
 **Manual Branch Cleanup**
+
 ```bash
 rune lock cleanup-branch feature/old-branch main
 ```
@@ -158,6 +180,7 @@ rune lock cleanup-branch feature/old-branch main
 ### Release Management
 
 **Release Lock Cleanup**
+
 ```bash
 # After creating a release tag
 git tag v1.2.0
@@ -173,6 +196,7 @@ rune lock cleanup-release v1.2.0
 The intelligent locking system automatically configures itself based on your project type, but you can customize the behavior:
 
 ### Lock Management Settings
+
 - **Intelligent Locking**: Enable/disable smart lock decisions
 - **Auto-unlock on Branch**: Automatically release locks when switching branches
 - **Release Lock Cleanup**: Clean up locks after release tagging
@@ -180,6 +204,7 @@ The intelligent locking system automatically configures itself based on your pro
 - **Lock Inheritance**: How locks are inherited between branches
 
 ### File Handling Settings
+
 - **Binary File Detection**: Automatically detect binary files
 - **Large File LFS**: Suggest LFS for files over size threshold
 - **Conflict Prevention**: Proactive conflict detection
@@ -188,6 +213,7 @@ The intelligent locking system automatically configures itself based on your pro
 ## Integration Examples
 
 ### Game Development Workflow
+
 ```bash
 # Working on Unreal Engine project
 rune lock detect  # Detects UE project, enables game-specific features
@@ -204,6 +230,7 @@ rune lock lfs-suggestions
 ```
 
 ### Web Development Workflow
+
 ```bash
 # Working on React project
 rune lock detect  # Detects package.json, enables web dev features
@@ -218,6 +245,7 @@ rune lock analyze dist/bundle.js
 ```
 
 ### Data Science Workflow
+
 ```bash
 # Working with Jupyter notebooks and datasets
 rune lock detect  # Detects .ipynb files, enables data science features
@@ -236,12 +264,14 @@ rune lock lfs-suggestions
 ## Performance Benefits
 
 ### Intelligent Storage Optimization
+
 - **Smart Delta Compression**: Optimized for your file types
 - **Predictive Caching**: Pre-loads likely-to-be-accessed files
 - **Parallel Processing**: Multi-threaded operations for large projects
 - **Memory Optimization**: Efficient memory usage for large repositories
 
 ### Team Collaboration
+
 - **Conflict Reduction**: Up to 80% fewer merge conflicts
 - **Faster Builds**: LFS optimization reduces clone times
 - **Better Coordination**: Visible lock status prevents conflicts
@@ -249,22 +279,23 @@ rune lock lfs-suggestions
 
 ## Comparison with Traditional Systems
 
-| Feature | Traditional VCS | Perforce | Rune Intelligent Locking |
-|---------|----------------|----------|---------------------------|
-| Binary File Handling | ❌ Poor | ✅ Good | ✅ Excellent |
-| Automatic LFS | ❌ Manual | ❌ Manual | ✅ Intelligent |
-| Project Type Awareness | ❌ None | ❌ Limited | ✅ Comprehensive |
-| Conflict Prevention | ❌ Reactive | ⚠️ Manual | ✅ Proactive |
-| Branch-Aware Locking | ❌ None | ⚠️ Limited | ✅ Smart |
-| Release Management | ❌ Manual | ⚠️ Manual | ✅ Automated |
-| Cross-Platform | ✅ Good | ❌ Poor | ✅ Excellent |
-| Setup Complexity | ✅ Simple | ❌ Complex | ✅ Automatic |
+| Feature                | Traditional VCS | Perforce   | Rune Intelligent Locking |
+| ---------------------- | --------------- | ---------- | ------------------------ |
+| Binary File Handling   | ❌ Poor         | ✅ Good    | ✅ Excellent             |
+| Automatic LFS          | ❌ Manual       | ❌ Manual  | ✅ Intelligent           |
+| Project Type Awareness | ❌ None         | ❌ Limited | ✅ Comprehensive         |
+| Conflict Prevention    | ❌ Reactive     | ⚠️ Manual  | ✅ Proactive             |
+| Branch-Aware Locking   | ❌ None         | ⚠️ Limited | ✅ Smart                 |
+| Release Management     | ❌ Manual       | ⚠️ Manual  | ✅ Automated             |
+| Cross-Platform         | ✅ Good         | ❌ Poor    | ✅ Excellent             |
+| Setup Complexity       | ✅ Simple       | ❌ Complex | ✅ Automatic             |
 
 ## Troubleshooting
 
 ### Common Issues
 
 **Lock conflicts between team members**
+
 ```bash
 # Force unlock if necessary (use carefully)
 rune lock unlock src/main.rs --force
@@ -274,6 +305,7 @@ rune lock status
 ```
 
 **Locks not being released on branch switch**
+
 ```bash
 # Check configuration
 rune config get intelligence.lock_management.auto_unlock_on_branch
@@ -283,6 +315,7 @@ rune lock cleanup-branch old-branch new-branch
 ```
 
 **LFS suggestions not appearing**
+
 ```bash
 # Ensure file handling is enabled
 rune config get intelligence.file_handling.large_file_lfs
@@ -294,7 +327,7 @@ rune lock analyze large_file.zip
 ### Best Practices
 
 1. **Use appropriate lock reasons** - This helps team members understand intent
-2. **Regular cleanup** - Use release cleanup to prevent lock accumulation  
+2. **Regular cleanup** - Use release cleanup to prevent lock accumulation
 3. **Configure for your workflow** - Adjust settings based on team size and project type
 4. **Monitor lock status** - Regular `rune lock status` checks prevent conflicts
 5. **LFS early and often** - Follow LFS suggestions to improve performance
@@ -315,7 +348,7 @@ curl http://team-server:7421/api/locks/status
 
 - **Machine Learning Conflict Prediction**: Learn from your team's patterns
 - **IDE Integration**: Real-time lock status in VS Code, JetBrains IDEs
-- **CI/CD Integration**: Automated lock management in build pipelines  
+- **CI/CD Integration**: Automated lock management in build pipelines
 - **Advanced Analytics**: Lock usage statistics and optimization suggestions
 - **Custom Rules Engine**: Define project-specific locking policies
 

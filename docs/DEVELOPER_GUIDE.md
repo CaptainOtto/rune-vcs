@@ -7,7 +7,9 @@ Rune VCS is built with a modular architecture consisting of 8 specialized crates
 ### Core Crates
 
 #### `rune-core` - Data Structures
+
 Core data structures and types used throughout the system:
+
 - `Author` - Commit author information
 - `Commit` - Commit metadata and relationships
 - Intelligence module for smart operations
@@ -22,7 +24,9 @@ let author = Author {
 ```
 
 #### `rune-store` - Repository Storage
+
 Handles all repository storage operations:
+
 - Repository creation and discovery
 - File staging and commit operations
 - Branch and reference management
@@ -47,6 +51,7 @@ let commit = store.commit("Initial commit", author)?;
 ### Specialized Crates
 
 #### `rune-delta` - Binary Delta Compression
+
 Efficient binary delta compression for storage optimization:
 
 ```rust
@@ -64,6 +69,7 @@ assert_eq!(result, new);
 ```
 
 #### `rune-pack` - Blob Packing
+
 Compression and packing of multiple blobs:
 
 ```rust
@@ -82,6 +88,7 @@ let content = unpack_blob(&pack_data, entry)?;
 ```
 
 #### `rune-lfs` - Large File Storage
+
 Handles large files and file locking:
 
 ```rust
@@ -96,6 +103,7 @@ let lock_manager = LockManager::new();
 ```
 
 #### `rune-performance` - Performance Optimization
+
 Performance metrics and optimization strategies:
 
 ```rust
@@ -110,6 +118,7 @@ engine.smart_delta(&base, &new)?;
 ```
 
 #### `rune-remote` - Network Operations
+
 Handles remote repository operations and shrine integration:
 
 ```rust
@@ -119,11 +128,13 @@ let shrine = Shrine::new("https://remote.example.com".to_string());
 ```
 
 #### `rune-cli` - Command Line Interface
+
 User-facing CLI application built on top of the core libraries.
 
 ## Testing Strategy
 
 ### Unit Tests (82 total)
+
 - **rune-core**: 5 tests (Author, Commit structures)
 - **rune-store**: 18 tests (Repository operations)
 - **rune-delta**: 17 tests (Delta compression)
@@ -134,18 +145,22 @@ User-facing CLI application built on top of the core libraries.
 - **rune-cli**: 3 tests (CLI interface)
 
 ### Integration Tests
+
 - Complete VCS workflows
 - Multi-file operations
 - Repository discovery
 - Error handling scenarios
 
 ### Benchmarks
+
 Performance benchmarks for critical operations:
+
 - Delta compression performance
 - Pack operation efficiency
 - Store operation speed
 
 Run benchmarks with:
+
 ```bash
 cargo bench
 ```
@@ -178,16 +193,19 @@ cargo bench
 ## Performance Characteristics
 
 ### Delta Compression
+
 - Efficient for text files and similar binaries
 - ~10-90% compression ratio depending on similarity
-- O(n*m) complexity where n=base size, m=new size
+- O(n\*m) complexity where n=base size, m=new size
 
 ### Pack Operations
+
 - Zstd compression for optimal size/speed tradeoff
 - Batch operations for multiple files
 - Incremental packing support
 
 ### Storage Operations
+
 - Atomic commits with rollback support
 - Concurrent read operations
 - Lock-free index operations where possible
@@ -207,6 +225,7 @@ fn example_operation() -> Result<()> {
 ```
 
 Common error scenarios:
+
 - Repository not found
 - File not found during staging
 - Nothing staged for commit

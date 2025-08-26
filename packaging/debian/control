@@ -5,17 +5,18 @@ Priority: optional
 Architecture: amd64
 Maintainer: Rune Maintainers <dev@example.invalid>
 Description: Rune - A modern, intelligent version control system
- Rune is a next-generation distributed version control system designed for
- performance, scalability, and ease of use. It features intelligent file
- analysis, advanced branching capabilities, and seamless integration with
- modern development workflows.
- .
- Key features:
-  * Fast and efficient operations
-  * Intelligent file tracking and analysis
-  * Advanced branching and merging
-  * Built-in large file support (LFS)
-  * Modern CLI with enhanced user experience
-  * Cross-platform compatibility
-Homepage: https://github.com/CaptainOtto/rune-vcs
-Depends: libc6 (>= 2.17)
+Rune is a next-generation distributed version control system designed for
+performance, scalability, and ease of use. It features intelligent file
+analysis, advanced branching capabilities, and seamless integration with
+modern development workflows.
+.
+Key features:
+
+- Fast and efficient operations
+- Intelligent file tracking and analysis
+- Advanced branching and merging
+- Built-in large file support (LFS)
+- Modern CLI with enhanced user experience
+- Cross-platform compatibility
+  Homepage: https://github.com/CaptainOtto/rune-vcs
+  Depends: libc6 (>= 2.17)

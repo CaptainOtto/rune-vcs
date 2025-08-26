@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to update tap for'
+        description: "Version to update tap for"
         required: true
-        default: 'v0.2.0'
+        default: "v0.2.0"
 
 env:
   CARGO_TERM_COLOR: always
@@ -71,10 +71,10 @@ jobs:
       - name: Update Formula
         run: |
           cd homebrew-tap
-          
+
           # Create Formula directory if it doesn't exist
           mkdir -p Formula
-          
+
           # Create or update the rune.rb formula
           cat > Formula/rune.rb << EOF
           class Rune < Formula

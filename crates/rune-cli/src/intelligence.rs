@@ -1,8 +1,8 @@
+use colored::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
-use colored::*;
 use walkdir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,7 +63,16 @@ pub enum FileType {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Language {
-    Rust, Python, JavaScript, TypeScript, Go, C, Cpp, Java, Kotlin, Other(String),
+    Rust,
+    Python,
+    JavaScript,
+    TypeScript,
+    Go,
+    C,
+    Cpp,
+    Java,
+    Kotlin,
+    Other(String),
 }
 
 #[derive(Debug, Clone)]
@@ -76,7 +85,9 @@ pub struct SecurityIssue {
 
 #[derive(Debug, Clone)]
 pub enum SecurityCategory {
-    Credentials, Certificates, Configuration,
+    Credentials,
+    Certificates,
+    Configuration,
 }
 
 #[derive(Debug, Clone)]
@@ -94,7 +105,9 @@ pub struct Suggestion {
 
 #[derive(Debug, Clone)]
 pub enum SuggestionCategory {
-    Performance, Security, Organization,
+    Performance,
+    Security,
+    Organization,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,12 +152,16 @@ pub struct PredictiveInsight {
 
 #[derive(Debug, Clone)]
 pub enum InsightCategory {
-    Security, Performance, Documentation, Legal,
+    Security,
+    Performance,
+    Documentation,
+    Legal,
 }
 
 #[derive(Debug, Clone)]
 pub enum InsightSeverity {
-    Medium, High,
+    Medium,
+    High,
 }
 
 pub struct IntelligentFileAnalyzer {
@@ -331,17 +348,23 @@ impl IntelligentFileAnalyzer {
         }
     }
 
-    pub fn analyze_repository(&mut self, repo_path: &Path) -> Result<RepositoryInsights, std::io::Error> {
+    pub fn analyze_repository(
+        &mut self,
+        repo_path: &Path,
+    ) -> Result<RepositoryInsights, std::io::Error> {
         if !self.config.features.repository_health {
             return Ok(RepositoryInsights::default());
         }
 
-        println!("{}", "🧠 Analyzing repository intelligence...".cyan().bold());
-        
+        println!(
+            "{}",
+            "🧠 Analyzing repository intelligence...".cyan().bold()
+        );
+
         let mut code_metrics = CodeMetrics::default();
         let mut files_analyzed = 0;
         let mut total_size = 0u64;
-        
+
         // Walk through repository
         for entry in walkdir::WalkDir::new(repo_path) {
             let entry = entry?;
@@ -360,12 +383,13 @@ impl IntelligentFileAnalyzer {
         }
 
         code_metrics.total_files = files_analyzed;
-        
+
         let project_type = self.detect_project_type(repo_path);
         let quality_score = self.calculate_quality_score(&code_metrics);
         let health_indicators = self.generate_health_indicators(&code_metrics, total_size);
         let growth_patterns = self.analyze_growth_patterns(&code_metrics);
-        let optimization_suggestions = self.generate_optimization_suggestions(&code_metrics, &project_type);
+        let optimization_suggestions =
+            self.generate_optimization_suggestions(&code_metrics, &project_type);
 
         self.repository_insights = RepositoryInsights {
             project_type,
@@ -385,7 +409,7 @@ impl IntelligentFileAnalyzer {
         }
 
         let mut insights = vec![];
-        
+
         // Analyze cache efficiency
         if let Some(cache_insight) = self.predict_cache_optimization() {
             insights.push(cache_insight);
@@ -410,21 +434,27 @@ impl IntelligentFileAnalyzer {
     }
 
     pub fn get_smart_caching_suggestions(&self) -> Vec<CachePrediction> {
-        self.predictive_model.cache_predictions.values().cloned().collect()
+        self.predictive_model
+            .cache_predictions
+            .values()
+            .cloned()
+            .collect()
     }
 
     pub fn update_access_pattern(&mut self, file_path: &str) {
-        let pattern = self.predictive_model.access_patterns
+        let pattern = self
+            .predictive_model
+            .access_patterns
             .entry(file_path.to_string())
             .or_insert(AccessPattern {
                 frequency: 0,
                 last_accessed: std::time::SystemTime::now(),
                 access_trend: AccessTrend::Stable,
             });
-        
+
         pattern.frequency += 1;
         pattern.last_accessed = std::time::SystemTime::now();
-        
+
         // Update trend based on frequency changes
         if pattern.frequency > 10 {
             pattern.access_trend = AccessTrend::Increasing;
@@ -435,11 +465,13 @@ impl IntelligentFileAnalyzer {
 
     fn should_analyze_file(&self, file_path: &str) -> bool {
         let path = Path::new(file_path);
-        
+
         // Skip hidden files and directories
-        if path.file_name()
+        if path
+            .file_name()
             .and_then(|name| name.to_str())
-            .map_or(false, |name| name.starts_with('.')) {
+            .map_or(false, |name| name.starts_with('.'))
+        {
             return false;
         }
 
@@ -470,17 +502,24 @@ impl IntelligentFileAnalyzer {
             Language::Kotlin => "Kotlin",
             Language::Other(name) => name,
         };
-        
-        *metrics.language_distribution.entry(lang.to_string()).or_insert(0) += 1;
+
+        *metrics
+            .language_distribution
+            .entry(lang.to_string())
+            .or_insert(0) += 1;
 
         // Estimate lines of code for text files
         if let Ok(content) = std::fs::read_to_string(path) {
             metrics.lines_of_code += content.lines().count();
-            
+
             // Simple heuristics for documentation ratio
-            if path.extension().and_then(|ext| ext.to_str()).map_or(false, |ext| {
-                matches!(ext.to_lowercase().as_str(), "md" | "txt" | "rst" | "adoc")
-            }) {
+            if path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map_or(false, |ext| {
+                    matches!(ext.to_lowercase().as_str(), "md" | "txt" | "rst" | "adoc")
+                })
+            {
                 metrics.documentation_ratio += 1.0;
             }
         }
@@ -511,12 +550,20 @@ impl IntelligentFileAnalyzer {
         }
         if repo_path.join("requirements.txt").exists() || repo_path.join("setup.py").exists() {
             // Check for data science indicators
-            if let Ok(content) = std::fs::read_to_string(repo_path.join("requirements.txt").as_path())
-                .or_else(|_| std::fs::read_to_string(repo_path.join("setup.py").as_path())) {
-                if content.contains("pandas") || content.contains("numpy") || content.contains("sklearn") {
+            if let Ok(content) =
+                std::fs::read_to_string(repo_path.join("requirements.txt").as_path())
+                    .or_else(|_| std::fs::read_to_string(repo_path.join("setup.py").as_path()))
+            {
+                if content.contains("pandas")
+                    || content.contains("numpy")
+                    || content.contains("sklearn")
+                {
                     return ProjectType::DataScience;
                 }
-                if content.contains("tensorflow") || content.contains("torch") || content.contains("keras") {
+                if content.contains("tensorflow")
+                    || content.contains("torch")
+                    || content.contains("keras")
+                {
                     return ProjectType::MachineLearning;
                 }
             }
@@ -573,7 +620,11 @@ impl IntelligentFileAnalyzer {
         }
     }
 
-    fn generate_health_indicators(&self, metrics: &CodeMetrics, total_size: u64) -> Vec<HealthIndicator> {
+    fn generate_health_indicators(
+        &self,
+        metrics: &CodeMetrics,
+        total_size: u64,
+    ) -> Vec<HealthIndicator> {
         let mut indicators = vec![];
 
         // File count indicator
@@ -581,16 +632,19 @@ impl IntelligentFileAnalyzer {
             0..=10 => (HealthStatus::Warning, "Very few files detected"),
             11..=100 => (HealthStatus::Good, "Healthy file count"),
             101..=1000 => (HealthStatus::Excellent, "Well-structured project"),
-            _ => (HealthStatus::Warning, "Very large project - consider modularization"),
+            _ => (
+                HealthStatus::Warning,
+                "Very large project - consider modularization",
+            ),
         };
         indicators.push(HealthIndicator {
             indicator: "Project Size".to_string(),
             status: file_status.0,
             description: file_status.1.to_string(),
-            severity: if matches!(file_status.0, HealthStatus::Warning) { 
-                HealthSeverity::Medium 
-            } else { 
-                HealthSeverity::Low 
+            severity: if matches!(file_status.0, HealthStatus::Warning) {
+                HealthSeverity::Medium
+            } else {
+                HealthSeverity::Low
             },
         });
 
@@ -623,7 +677,10 @@ impl IntelligentFileAnalyzer {
             s if s < 10.0 => (HealthStatus::Good, "Compact repository size"),
             s if s < 100.0 => (HealthStatus::Good, "Reasonable repository size"),
             s if s < 500.0 => (HealthStatus::Warning, "Large repository - consider LFS"),
-            _ => (HealthStatus::Critical, "Very large repository - LFS recommended"),
+            _ => (
+                HealthStatus::Critical,
+                "Very large repository - LFS recommended",
+            ),
         };
         indicators.push(HealthIndicator {
             indicator: "Repository Size".to_string(),
@@ -643,15 +700,19 @@ impl IntelligentFileAnalyzer {
         // Simplified growth pattern analysis
         // In a real implementation, this would analyze commit history
         GrowthPatterns {
-            files_growth_rate: 0.1, // 10% growth assumed
-            size_growth_rate: 0.15,  // 15% size growth assumed
+            files_growth_rate: 0.1,       // 10% growth assumed
+            size_growth_rate: 0.15,       // 15% size growth assumed
             complexity_growth_rate: 0.05, // 5% complexity growth
             predicted_size_6months: ((metrics.total_files as f64) * 1.5) as u64,
             predicted_files_6months: ((metrics.total_files as f64) * 1.3) as usize,
         }
     }
 
-    fn generate_optimization_suggestions(&self, metrics: &CodeMetrics, project_type: &ProjectType) -> Vec<OptimizationSuggestion> {
+    fn generate_optimization_suggestions(
+        &self,
+        metrics: &CodeMetrics,
+        project_type: &ProjectType,
+    ) -> Vec<OptimizationSuggestion> {
         let mut suggestions = vec![];
 
         // Documentation suggestions
@@ -660,11 +721,13 @@ impl IntelligentFileAnalyzer {
         } else {
             0.0
         };
-        
+
         if doc_ratio < 0.1 {
             suggestions.push(OptimizationSuggestion {
                 category: OptimizationCategory::Documentation,
-                suggestion: "Add README.md and API documentation to improve project maintainability".to_string(),
+                suggestion:
+                    "Add README.md and API documentation to improve project maintainability"
+                        .to_string(),
                 impact_score: 8.5,
                 effort_required: EffortLevel::Medium,
             });
@@ -675,11 +738,12 @@ impl IntelligentFileAnalyzer {
             ProjectType::Rust => {
                 suggestions.push(OptimizationSuggestion {
                     category: OptimizationCategory::Performance,
-                    suggestion: "Consider using cargo-audit for security vulnerability scanning".to_string(),
+                    suggestion: "Consider using cargo-audit for security vulnerability scanning"
+                        .to_string(),
                     impact_score: 7.0,
                     effort_required: EffortLevel::Low,
                 });
-            },
+            }
             ProjectType::JavaScript | ProjectType::TypeScript => {
                 suggestions.push(OptimizationSuggestion {
                     category: OptimizationCategory::Security,
@@ -687,23 +751,26 @@ impl IntelligentFileAnalyzer {
                     impact_score: 8.0,
                     effort_required: EffortLevel::Low,
                 });
-            },
+            }
             ProjectType::Python => {
                 suggestions.push(OptimizationSuggestion {
                     category: OptimizationCategory::Security,
-                    suggestion: "Use safety or pip-audit to scan for known vulnerabilities".to_string(),
+                    suggestion: "Use safety or pip-audit to scan for known vulnerabilities"
+                        .to_string(),
                     impact_score: 7.5,
                     effort_required: EffortLevel::Low,
                 });
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         // Size-based suggestions
         if metrics.total_files > 500 {
             suggestions.push(OptimizationSuggestion {
                 category: OptimizationCategory::Storage,
-                suggestion: "Consider implementing LFS for large binary files to improve clone performance".to_string(),
+                suggestion:
+                    "Consider implementing LFS for large binary files to improve clone performance"
+                        .to_string(),
                 impact_score: 9.0,
                 effort_required: EffortLevel::Medium,
             });
@@ -714,7 +781,9 @@ impl IntelligentFileAnalyzer {
 
     fn predict_cache_optimization(&self) -> Option<PredictiveInsight> {
         // Analyze access patterns to suggest cache optimizations
-        let high_frequency_files = self.predictive_model.access_patterns
+        let high_frequency_files = self
+            .predictive_model
+            .access_patterns
             .iter()
             .filter(|(_, pattern)| pattern.frequency > 5)
             .count();
@@ -734,7 +803,9 @@ impl IntelligentFileAnalyzer {
     fn predict_security_issues(&self, _repo_path: &Path) -> Option<PredictiveInsight> {
         // Simplified security prediction
         Some(PredictiveInsight {
-            insight: "Regular security audits recommended. Run dependency vulnerability scans monthly.".to_string(),
+            insight:
+                "Regular security audits recommended. Run dependency vulnerability scans monthly."
+                    .to_string(),
             confidence: 0.75,
             category: InsightCategory::Security,
             severity: InsightSeverity::Medium,
@@ -744,7 +815,7 @@ impl IntelligentFileAnalyzer {
     fn predict_performance_bottlenecks(&self) -> Option<PredictiveInsight> {
         // Analyze code metrics for potential performance issues
         let total_files = self.repository_insights.code_metrics.total_files;
-        
+
         if total_files > 1000 {
             Some(PredictiveInsight {
                 insight: "Large codebase detected. Consider implementing incremental compilation and caching strategies.".to_string(),
@@ -759,8 +830,8 @@ impl IntelligentFileAnalyzer {
 
     fn predict_documentation_needs(&self) -> Option<PredictiveInsight> {
         let doc_ratio = if self.repository_insights.code_metrics.total_files > 0 {
-            self.repository_insights.code_metrics.documentation_ratio / 
-            self.repository_insights.code_metrics.total_files as f64
+            self.repository_insights.code_metrics.documentation_ratio
+                / self.repository_insights.code_metrics.total_files as f64
         } else {
             0.0
         };
@@ -798,7 +869,7 @@ impl IntelligentFileAnalyzer {
         let file_type = self.detect_file_type(&extension, file_size, file_path);
         let language = self.detect_language(&extension);
         let contents = fs::read_to_string(file_path).unwrap_or_default();
-        
+
         let security_issues = if self.config.features.security_analysis {
             self.analyze_security(file_path, &contents)
         } else {
@@ -849,7 +920,8 @@ impl IntelligentFileAnalyzer {
             "json" | "yaml" | "yml" | "toml" | "ini" | "cfg" => FileType::Configuration,
             "md" | "txt" | "doc" | "docx" | "pdf" => FileType::Documentation,
             _ => {
-                if file_size > 10_000_000 { // Assume large files are binary
+                if file_size > 10_000_000 {
+                    // Assume large files are binary
                     FileType::Binary
                 } else {
                     FileType::Text
@@ -879,7 +951,10 @@ impl IntelligentFileAnalyzer {
         let lower_contents = contents.to_lowercase();
 
         // Check for credential files
-        if lower_path.contains(".env") || lower_path.contains("secret") || lower_path.contains("password") {
+        if lower_path.contains(".env")
+            || lower_path.contains("secret")
+            || lower_path.contains("password")
+        {
             issues.push(SecurityIssue {
                 issue_type: "Potential credential file".to_string(),
                 severity: "High".to_string(),
@@ -889,8 +964,11 @@ impl IntelligentFileAnalyzer {
         }
 
         // Check for hardcoded secrets in content
-        if lower_contents.contains("password") || lower_contents.contains("api_key") || 
-           lower_contents.contains("secret") || lower_contents.contains("token") {
+        if lower_contents.contains("password")
+            || lower_contents.contains("api_key")
+            || lower_contents.contains("secret")
+            || lower_contents.contains("token")
+        {
             issues.push(SecurityIssue {
                 issue_type: "Potential hardcoded secret".to_string(),
                 severity: "High".to_string(),
@@ -903,9 +981,11 @@ impl IntelligentFileAnalyzer {
     }
 
     fn analyze_performance_impact(&self, file_size: u64) -> PerformanceImpact {
-        let storage_efficiency = if file_size > 100_000_000 { // 100MB
+        let storage_efficiency = if file_size > 100_000_000 {
+            // 100MB
             0.3
-        } else if file_size > 10_000_000 { // 10MB
+        } else if file_size > 10_000_000 {
+            // 10MB
             0.7
         } else {
             1.0
@@ -917,10 +997,16 @@ impl IntelligentFileAnalyzer {
         }
     }
 
-    fn generate_suggestions(&self, file_path: &str, file_size: u64, security_issues: &[SecurityIssue]) -> Vec<Suggestion> {
+    fn generate_suggestions(
+        &self,
+        file_path: &str,
+        file_size: u64,
+        security_issues: &[SecurityIssue],
+    ) -> Vec<Suggestion> {
         let mut suggestions = Vec::new();
 
-        if file_size > 50_000_000 { // 50MB
+        if file_size > 50_000_000 {
+            // 50MB
             suggestions.push(Suggestion {
                 action: "Consider using Git LFS for this large file".to_string(),
                 priority: "Medium".to_string(),
@@ -957,10 +1043,20 @@ impl IntelligentFileAnalyzer {
         println!("  Type: {:?}", analysis.file_type);
         println!("  Language: {:?}", analysis.language);
         println!("  Size: {} bytes", analysis.size_bytes);
-        println!("  LFS Suggested: {}", if analysis.suggested_lfs { "Yes".green() } else { "No".red() });
-        
+        println!(
+            "  LFS Suggested: {}",
+            if analysis.suggested_lfs {
+                "Yes".green()
+            } else {
+                "No".red()
+            }
+        );
+
         if !analysis.security_issues.is_empty() {
-            println!("  Security: {} issues found", analysis.security_issues.len());
+            println!(
+                "  Security: {} issues found",
+                analysis.security_issues.len()
+            );
             for issue in &analysis.security_issues {
                 println!("    - {}: {}", issue.severity.red(), issue.description);
             }
@@ -969,7 +1065,11 @@ impl IntelligentFileAnalyzer {
         if !analysis.suggestions.is_empty() {
             println!("  Suggestions:");
             for suggestion in &analysis.suggestions {
-                println!("    - [{}] {}", suggestion.priority.yellow(), suggestion.action);
+                println!(
+                    "    - [{}] {}",
+                    suggestion.priority.yellow(),
+                    suggestion.action
+                );
             }
         }
     }
@@ -1029,19 +1129,26 @@ impl RepositoryInsights {
     pub fn display_comprehensive_report(&self) {
         println!("\n{}", "📊 REPOSITORY INTELLIGENCE REPORT".cyan().bold());
         println!("{}", "═".repeat(50).cyan());
-        
+
         // Project overview
         println!("\n{}", "🎯 Project Overview".yellow().bold());
         println!("  Project Type: {:?}", self.project_type);
         println!("  Quality Score: {:.1}/100", self.quality_score);
-        
+
         // Code metrics
         println!("\n{}", "📈 Code Metrics".yellow().bold());
         println!("  Total Files: {}", self.code_metrics.total_files);
         println!("  Lines of Code: {}", self.code_metrics.lines_of_code);
-        println!("  Documentation Ratio: {:.1}%", self.code_metrics.documentation_ratio * 100.0 / self.code_metrics.total_files.max(1) as f64);
-        println!("  Maintainability Index: {:.1}/1.0", self.code_metrics.maintainability_index);
-        
+        println!(
+            "  Documentation Ratio: {:.1}%",
+            self.code_metrics.documentation_ratio * 100.0
+                / self.code_metrics.total_files.max(1) as f64
+        );
+        println!(
+            "  Maintainability Index: {:.1}/1.0",
+            self.code_metrics.maintainability_index
+        );
+
         // Language distribution
         if !self.code_metrics.language_distribution.is_empty() {
             println!("\n{}", "🌐 Language Distribution".yellow().bold());
@@ -1052,7 +1159,7 @@ impl RepositoryInsights {
                 println!("  {}: {} files ({:.1}%)", lang, count, percentage);
             }
         }
-        
+
         // Health indicators
         if !self.health_indicators.is_empty() {
             println!("\n{}", "🏥 Health Indicators".yellow().bold());
@@ -1063,16 +1170,28 @@ impl RepositoryInsights {
                     HealthStatus::Warning => "warning".yellow(),
                     HealthStatus::Critical => "critical".red(),
                 };
-                println!("  {} [{}]: {}", indicator.indicator, status_color, indicator.description);
+                println!(
+                    "  {} [{}]: {}",
+                    indicator.indicator, status_color, indicator.description
+                );
             }
         }
-        
+
         // Growth patterns
         println!("\n{}", "📊 Growth Patterns".yellow().bold());
-        println!("  Files Growth Rate: {:.1}%", self.growth_patterns.files_growth_rate * 100.0);
-        println!("  Size Growth Rate: {:.1}%", self.growth_patterns.size_growth_rate * 100.0);
-        println!("  Predicted Files (6 months): {}", self.growth_patterns.predicted_files_6months);
-        
+        println!(
+            "  Files Growth Rate: {:.1}%",
+            self.growth_patterns.files_growth_rate * 100.0
+        );
+        println!(
+            "  Size Growth Rate: {:.1}%",
+            self.growth_patterns.size_growth_rate * 100.0
+        );
+        println!(
+            "  Predicted Files (6 months): {}",
+            self.growth_patterns.predicted_files_6months
+        );
+
         // Optimization suggestions
         if !self.optimization_suggestions.is_empty() {
             println!("\n{}", "💡 Optimization Suggestions".yellow().bold());
@@ -1082,15 +1201,16 @@ impl RepositoryInsights {
                     EffortLevel::Medium => "medium effort".yellow(),
                     EffortLevel::High => "high effort".red(),
                 };
-                println!("  {}. [Impact: {:.1}] [{}] {}", 
-                    i + 1, 
-                    suggestion.impact_score, 
+                println!(
+                    "  {}. [Impact: {:.1}] [{}] {}",
+                    i + 1,
+                    suggestion.impact_score,
                     effort_color,
                     suggestion.suggestion
                 );
             }
         }
-        
+
         println!("\n{}", "═".repeat(50).cyan());
     }
 }
@@ -1107,11 +1227,12 @@ impl PredictiveInsight {
             InsightCategory::Documentation => "📚",
             InsightCategory::Legal => "⚖️",
         };
-        
-        println!("  {} [{}] [Confidence: {:.0}%] {}", 
-            category_icon, 
-            severity_color, 
-            self.confidence * 100.0, 
+
+        println!(
+            "  {} [{}] [Confidence: {:.0}%] {}",
+            category_icon,
+            severity_color,
+            self.confidence * 100.0,
             self.insight
         );
     }

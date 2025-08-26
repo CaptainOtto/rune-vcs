@@ -1,0 +1,17 @@
+[package]
+name = "rune-integration-tests"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+rune-core = { path = "crates/rune-core" }
+rune-store = { path = "crates/rune-store" }
+tempfile = { workspace = true }
+
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"
+
+[[test]]
+name = "cli_integration_tests"
+path = "tests/cli_integration_tests.rs"
