@@ -18,9 +18,9 @@
 - **Policy-as-Code** - Commit + branch rules; enforce conventional commits
 
 #### Implementation Priority:
-1. `v0.3.0-alpha.1` - Virtual workspace foundation
-2. `v0.3.0-alpha.2` - Draft commits system
-3. `v0.3.0-beta.1` - Performance guardrails
+1. `v0.3.0-alpha.1` ✅ - Virtual workspace core (COMPLETED)
+2. `v0.3.0-alpha.2` ✅ - Draft commits system (COMPLETED)
+3. `v0.3.0-alpha.3` - Policy-as-code framework
 4. `v0.3.0-rc.1` - Policy-as-code framework
 
 ---

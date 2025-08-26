@@ -1,0 +1,21 @@
+[package]
+name = "rune-draft"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.8", features = ["v4"] }
+blake3 = "1.5"
+chrono = { version = "0.4", features = ["serde"] }
+indexmap = "2.2"
+whoami = "1.4"
+rune-core = { path = "../rune-core" }
+rune-store = { path = "../rune-store" }
+
+[dev-dependencies]
+tempfile = "3.8"

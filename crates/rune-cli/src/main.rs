@@ -574,6 +574,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: commands::workspace::WorkspaceCmd,
     },
+    /// Draft commits and checkpoint management
+    Draft {
+        #[command(flatten)]
+        args: commands::draft::DraftArgs,
+    },
     /// GPG signing operations
     Sign {
         #[command(subcommand)]
@@ -2366,6 +2371,9 @@ async fn main() -> anyhow::Result<()> {
         },
         Cmd::Workspace { cmd } => {
             commands::workspace::run(cmd)?;
+        },
+        Cmd::Draft { args } => {
+            commands::draft::execute_draft_command(args)?;
         },
         Cmd::Sign { cmd } => match cmd {
             SignCmd::Setup { key } => {
