@@ -19,15 +19,20 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-latest
-            target: aarch64-apple-darwin
+          # macOS builds (these work well)
+          - target: aarch64-apple-darwin
+            os: macos-latest
             archive: tar.gz
-          - os: macos-13
-            target: x86_64-apple-darwin
+          - target: x86_64-apple-darwin
+            os: macos-13
             archive: tar.gz
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            archive: tar.gz
+          # Linux builds commented out until we fix cross-compilation
+          # - target: x86_64-unknown-linux-gnu
+          #   os: ubuntu-latest
+          #   archive: tar.gz
+          # - target: aarch64-unknown-linux-gnu
+          #   os: ubuntu-latest
+          #   archive: tar.gz
           # Commented out Windows for now to simplify
           # - os: windows-latest
           #   target: x86_64-pc-windows-msvc
@@ -42,17 +47,8 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install cargo-cross (for cross-compilation)
-        run: cargo install cross --git https://github.com/cross-rs/cross
-        if: matrix.target != 'x86_64-unknown-linux-gnu' && runner.os == 'Linux'
-
-      - name: Build (native)
+      - name: Build Release Binary
         run: cargo build --release --target ${{ matrix.target }}
-        if: matrix.target == 'x86_64-unknown-linux-gnu' || runner.os == 'macOS'
-
-      - name: Build (cross-compile)  
-        run: cross build --release --target ${{ matrix.target }}
-        if: matrix.target != 'x86_64-unknown-linux-gnu' && runner.os == 'Linux'
 
       - name: Package Release
         shell: bash
@@ -66,6 +62,14 @@ jobs:
           if [[ "${{ matrix.archive }}" == "tar.gz" ]]; then
             if [[ -f "target/${{ matrix.target }}/release/rune" ]]; then
               tar -czf dist/${NAME}.tar.gz -C target/${{ matrix.target }}/release rune
+              # Generate checksum for this file
+              cd dist
+              if [[ "${{ runner.os }}" == "macOS" ]]; then
+                shasum -a 256 ${NAME}.tar.gz > ${NAME}.tar.gz.sha256
+              else
+                sha256sum ${NAME}.tar.gz > ${NAME}.tar.gz.sha256
+              fi
+              cd ..
             else
               echo "Binary not found at target/${{ matrix.target }}/release/rune"
               ls -la target/${{ matrix.target }}/release/
@@ -76,6 +80,12 @@ jobs:
             if [[ -f "target/${{ matrix.target }}/release/rune.exe" ]]; then
               cd target/${{ matrix.target }}/release
               7z a ../../../dist/${NAME}.zip rune.exe
+              cd ../../../dist
+              if [[ "${{ runner.os }}" == "macOS" ]]; then
+                shasum -a 256 ${NAME}.zip > ${NAME}.zip.sha256
+              else
+                sha256sum ${NAME}.zip > ${NAME}.zip.sha256
+              fi
             else
               echo "Binary not found at target/${{ matrix.target }}/release/rune.exe"
               exit 1
@@ -85,30 +95,9 @@ jobs:
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/rune-*.${{ matrix.archive }}
+          files: |
+            dist/rune-*.${{ matrix.archive }}
+            dist/rune-*.${{ matrix.archive }}.sha256
           tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
-
-  create-checksums:
-    name: Create Checksums
-    needs: build
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Download release assets
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-          
-      - name: Generate checksums
-        run: |
-          cd artifacts
-          find . -name "*.tar.gz" -o -name "*.zip" | xargs sha256sum > checksums.txt
-          cat checksums.txt
-          
-      - name: Upload checksums
-        uses: softprops/action-gh-release@v2
-        with:
-          files: artifacts/checksums.txt
-          tag_name: ${{ github.ref_name }}
