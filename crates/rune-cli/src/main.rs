@@ -586,6 +586,11 @@ enum Cmd {
         #[command(flatten)]
         args: commands::draft::DraftArgs,
     },
+    /// Lightweight planning (markdown files in .rune/plans)
+    Plan {
+        #[command(subcommand)]
+        cmd: commands::plan::PlanCmd,
+    },
     /// GPG signing operations
     Sign {
         #[command(subcommand)]
@@ -2393,6 +2398,12 @@ async fn main() -> anyhow::Result<()> {
         }
         Cmd::Draft { args } => {
             commands::draft::execute_draft_command(args)?;
+        }
+        Cmd::Plan { cmd } => {
+            use commands::plan::{PlanArgs, execute_plan_command};
+            // Wrap single subcommand into PlanArgs for reuse pattern
+            let args = PlanArgs { command: cmd };
+            execute_plan_command(args)?;
         }
         Cmd::Sign { cmd } => match cmd {
             SignCmd::Setup { key } => {

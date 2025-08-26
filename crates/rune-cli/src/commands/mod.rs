@@ -5,3 +5,4 @@ pub mod intelligence;
 pub mod advanced;
 pub mod workspace;
 pub mod draft;
+pub mod plan;
