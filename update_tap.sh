@@ -71,15 +71,15 @@ class RuneVcs < Formula
   end
 
   def install
-    bin.install "rune"
+    bin.install "rune" => "rune-vcs"
   end
 
   test do
     # Test basic version command
-    assert_match version.to_s, shell_output("#{bin}/rune --version")
+    assert_match version.to_s, shell_output("#{bin}/rune-vcs --version")
     
     # Test that the doctor command works
-    system "#{bin}/rune", "doctor"
+    system "#{bin}/rune-vcs", "doctor"
   end
 end
 EOF
@@ -130,8 +130,8 @@ echo -e "${BLUE}  # or if already installed:${NC}"
 echo -e "${BLUE}  brew upgrade rune-vcs${NC}"
 echo
 echo -e "${BLUE}  # Test the installation${NC}"
-echo -e "${BLUE}  rune --version${NC}"
-echo -e "${BLUE}  rune doctor${NC}"
+echo -e "${BLUE}  rune-vcs --version${NC}"
+echo -e "${BLUE}  rune-vcs doctor${NC}"
 
 echo
 echo -e "${YELLOW}💡 For your AI/other projects:${NC}"

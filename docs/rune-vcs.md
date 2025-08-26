@@ -10,6 +10,7 @@
 rune-vcs är ett modernt versionshanteringssystem designat för att ersätta Git med förbättrad prestanda, AI-integration och smidigare workflow för moderna utvecklingsteam.
 
 ### Key Features
+
 - 🚀 **Performance**: Smart delta compression, predictive caching
 - 🧠 **AI-Powered**: Intelligent repository analysis and insights
 - 📦 **LFS Built-in**: Automatic large file handling
@@ -22,12 +23,14 @@ rune-vcs är ett modernt versionshanteringssystem designat för att ersätta Git
 ## 🚀 Installation
 
 ### macOS (Homebrew)
+
 ```bash
 brew tap johan-ott/rune-vcs
 brew install rune-vcs
 ```
 
 ### From Source
+
 ```bash
 git clone https://github.com/Johan-Ott/rune-vcs
 cd rune-vcs
@@ -36,6 +39,7 @@ sudo cp target/release/rune /usr/local/bin/rune-vcs
 ```
 
 ### Verify Installation
+
 ```bash
 rune-vcs --version
 rune-vcs doctor  # System diagnostics
@@ -46,6 +50,7 @@ rune-vcs doctor  # System diagnostics
 ## 🌟 Quick Start
 
 ### Initialize Repository
+
 ```bash
 # Create new repository
 rune-vcs init
@@ -59,6 +64,7 @@ rune-vcs config --global user.email "your.email@example.com"
 ```
 
 ### Basic Workflow
+
 ```bash
 # Check status
 rune-vcs status
@@ -84,6 +90,7 @@ rune-vcs log --oneline
 ## 🔄 Branch Management
 
 ### Creating and Switching Branches
+
 ```bash
 # Create new branch
 rune-vcs branch feature/new-feature
@@ -100,6 +107,7 @@ rune-vcs branch -a  # Include remote branches
 ```
 
 ### Merging
+
 ```bash
 # Merge branch into current
 rune-vcs merge feature/new-feature
@@ -112,6 +120,7 @@ rune-vcs merge --abort
 ```
 
 ### Cleaning Up
+
 ```bash
 # Delete local branch
 rune-vcs branch --delete feature/completed-feature
@@ -125,6 +134,7 @@ rune-vcs push origin --delete feature/completed-feature
 ## 🌐 Remote Operations
 
 ### Remote Management
+
 ```bash
 # Add remote
 rune-vcs remote add origin <url>
@@ -140,6 +150,7 @@ rune-vcs remote set-url origin <new-url>
 ```
 
 ### Syncing Changes
+
 ```bash
 # Fetch changes from remote
 rune-vcs fetch origin
@@ -159,6 +170,7 @@ rune-vcs push --all origin
 ## 📦 Large File Support (LFS)
 
 ### Automatic LFS
+
 ```bash
 # Track file types automatically
 rune-vcs lfs track "*.psd" "*.zip" "*.mp4"
@@ -174,6 +186,7 @@ rune-vcs lfs track --list
 ```
 
 ### Manual LFS Operations
+
 ```bash
 # Force add file to LFS
 rune-vcs lfs add large-file.zip
@@ -190,6 +203,7 @@ rune-vcs lfs push origin main
 ## 🧠 AI Intelligence Features
 
 ### Repository Analysis
+
 ```bash
 # Analyze code quality and patterns
 rune-vcs intelligence analyze
@@ -202,6 +216,7 @@ rune-vcs intelligence report --format=html
 ```
 
 ### Smart Suggestions
+
 ```bash
 # Get commit message suggestions
 rune-vcs intelligence suggest-commit
@@ -218,6 +233,7 @@ rune-vcs intelligence optimize
 ## 🔐 Security Features
 
 ### GPG Signing
+
 ```bash
 # Configure GPG key
 rune-vcs config --global user.signingkey <key-id>
@@ -231,6 +247,7 @@ rune-vcs log --show-signature
 ```
 
 ### Security Audit
+
 ```bash
 # Audit repository security
 rune-vcs security audit
@@ -247,6 +264,7 @@ rune-vcs security report
 ## 🔧 Advanced Operations
 
 ### Interactive Rebase
+
 ```bash
 # Interactive rebase last 3 commits
 rune-vcs rebase -i HEAD~3
@@ -262,6 +280,7 @@ rune-vcs rebase --abort
 ```
 
 ### Cherry-picking
+
 ```bash
 # Cherry-pick single commit
 rune-vcs cherry-pick <commit-hash>
@@ -274,6 +293,7 @@ rune-vcs cherry-pick --no-commit <commit-hash>
 ```
 
 ### Stashing
+
 ```bash
 # Stash current changes
 rune-vcs stash
@@ -300,6 +320,7 @@ rune-vcs stash drop stash@{0}
 ## 📊 Repository Management
 
 ### Status and Information
+
 ```bash
 # Detailed status
 rune-vcs status --verbose
@@ -314,6 +335,7 @@ rune-vcs stats --detailed
 ```
 
 ### Cleaning and Maintenance
+
 ```bash
 # Clean untracked files
 rune-vcs clean
@@ -333,6 +355,7 @@ rune-vcs optimize
 ## 🎨 Customization
 
 ### Configuration
+
 ```bash
 # Global configuration
 rune-vcs config --global core.editor vim
@@ -349,6 +372,7 @@ rune-vcs config --edit
 ```
 
 ### Aliases
+
 ```bash
 # Create aliases
 rune-vcs config --global alias.st status
@@ -366,6 +390,7 @@ rune-vcs co main  # Same as rune-vcs checkout main
 ## 🔍 Troubleshooting
 
 ### Common Issues
+
 ```bash
 # Reset to last commit (keep changes)
 rune-vcs reset --soft HEAD~1
@@ -386,6 +411,7 @@ rune-vcs bisect good <good-commit>
 ```
 
 ### Recovery Operations
+
 ```bash
 # Restore deleted file
 rune-vcs checkout HEAD -- deleted-file.txt
@@ -406,6 +432,7 @@ rune-vcs repair
 ## 📈 Performance Features
 
 ### Smart Caching
+
 ```bash
 # Enable predictive caching
 rune-vcs config performance.predictive-cache true
@@ -418,6 +445,7 @@ rune-vcs performance clear-cache
 ```
 
 ### Compression
+
 ```bash
 # Configure compression level
 rune-vcs config compression.level 6
@@ -434,6 +462,7 @@ rune-vcs compression stats
 ## 🔌 Integration
 
 ### Hooks
+
 ```bash
 # Install hooks
 rune-vcs hooks install
@@ -449,6 +478,7 @@ rune-vcs hooks test pre-commit
 ```
 
 ### API Server
+
 ```bash
 # Start local API server
 rune-vcs api start --port 8080
@@ -464,6 +494,7 @@ curl http://localhost:8080/branches
 ## 🛠️ Submodules
 
 ### Basic Submodule Operations
+
 ```bash
 # Add submodule
 rune-vcs submodule add <url> <path>
@@ -479,6 +510,7 @@ rune-vcs submodule update --remote
 ```
 
 ### Advanced Submodule Management
+
 ```bash
 # Remove submodule
 rune-vcs submodule remove <path>
@@ -495,6 +527,7 @@ rune-vcs submodule foreach "git status"
 ## 📚 Documentation and Help
 
 ### Getting Help
+
 ```bash
 # General help
 rune-vcs help
@@ -515,6 +548,7 @@ rune-vcs tutorial
 ```
 
 ### Guides and Examples
+
 ```bash
 # View workflow examples
 rune-vcs examples workflow
@@ -531,6 +565,7 @@ rune-vcs guide best-practices
 ## 🎯 Git Migration
 
 ### Migration Commands
+
 ```bash
 # Convert Git repository to Rune
 rune-vcs migrate from-git /path/to/git-repo
@@ -543,25 +578,27 @@ rune-vcs compare-with-git
 ```
 
 ### Git Compatibility
-| Git Command | Rune VCS Equivalent |
-|-------------|-------------------|
-| `git init` | `rune-vcs init` |
-| `git add .` | `rune-vcs add .` |
+
+| Git Command           | Rune VCS Equivalent        |
+| --------------------- | -------------------------- |
+| `git init`            | `rune-vcs init`            |
+| `git add .`           | `rune-vcs add .`           |
 | `git commit -m "msg"` | `rune-vcs commit -m "msg"` |
-| `git status` | `rune-vcs status` |
-| `git log` | `rune-vcs log` |
-| `git branch` | `rune-vcs branch` |
-| `git checkout` | `rune-vcs checkout` |
-| `git merge` | `rune-vcs merge` |
-| `git push` | `rune-vcs push` |
-| `git pull` | `rune-vcs pull` |
-| `git clone` | `rune-vcs clone` |
+| `git status`          | `rune-vcs status`          |
+| `git log`             | `rune-vcs log`             |
+| `git branch`          | `rune-vcs branch`          |
+| `git checkout`        | `rune-vcs checkout`        |
+| `git merge`           | `rune-vcs merge`           |
+| `git push`            | `rune-vcs push`            |
+| `git pull`            | `rune-vcs pull`            |
+| `git clone`           | `rune-vcs clone`           |
 
 ---
 
 ## 📋 Conventional Commits
 
 ### Commit Types
+
 ```bash
 # Features
 rune-vcs commit -m "feat: add user authentication"
@@ -592,6 +629,7 @@ rune-vcs commit -m "feat!: redesign API interface"
 ## 🔄 Workflows
 
 ### Feature Development Workflow
+
 ```bash
 # 1. Start from main
 rune-vcs checkout main
@@ -617,6 +655,7 @@ rune-vcs branch --delete feature/new-feature
 ```
 
 ### Hotfix Workflow
+
 ```bash
 # 1. Create hotfix from main
 rune-vcs checkout main
@@ -642,6 +681,7 @@ rune-vcs push origin main --tags
 ## 📊 Performance Monitoring
 
 ### Performance Statistics
+
 ```bash
 # Repository performance overview
 rune-vcs performance overview
@@ -657,6 +697,7 @@ rune-vcs performance network
 ```
 
 ### Optimization
+
 ```bash
 # Optimize repository for performance
 rune-vcs optimize --aggressive
@@ -673,6 +714,7 @@ rune-vcs profile
 ## 🌟 Best Practices
 
 ### Repository Organization
+
 - Use clear, descriptive branch names (`feature/user-auth`, `fix/memory-leak`)
 - Keep commits small and focused
 - Write meaningful commit messages using conventional commits
@@ -680,12 +722,14 @@ rune-vcs profile
 - Regularly sync with remote repositories
 
 ### Performance Tips
+
 - Enable predictive caching for frequently accessed repositories
 - Use LFS for binary files larger than 10MB
 - Regularly run `rune-vcs optimize` on large repositories
 - Configure appropriate compression levels for your use case
 
 ### Security Recommendations
+
 - Enable GPG signing for sensitive repositories
 - Regularly audit repository security with `rune-vcs security audit`
 - Use SSH keys for remote authentication
@@ -696,12 +740,14 @@ rune-vcs profile
 ## 🔗 Resources
 
 ### Official Links
+
 - **Homepage**: https://github.com/Johan-Ott/rune-vcs
 - **Documentation**: `rune-vcs docs`
 - **Issues**: https://github.com/Johan-Ott/rune-vcs/issues
 - **Releases**: https://github.com/Johan-Ott/rune-vcs/releases
 
 ### Community
+
 - **Discussions**: GitHub Discussions
 - **Stack Overflow**: Tag `rune-vcs`
 - **Discord**: [Community Server]
@@ -714,5 +760,5 @@ MIT License - see LICENSE file for details.
 
 ---
 
-*Last updated: 2025-08-26*  
-*Rune VCS version: 0.2.5*
+_Last updated: 2025-08-26_  
+_Rune VCS version: 0.2.5_

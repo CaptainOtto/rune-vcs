@@ -12,9 +12,9 @@ use rune_docs::DocsEngine;
 use rune_performance::PerformanceEngine;
 use style::{init_colors, Style};
 pub mod intelligence;
+use chrono;
 use intelligence::{InsightSeverity, IntelligentFileAnalyzer};
 use std::{fs, io::Write, path::PathBuf};
-use chrono;
 
 /// Global execution context carrying user preferences
 #[derive(Debug, Clone)]
@@ -325,7 +325,10 @@ enum HooksCmd {
     },
     /// Enable quality bundle (format, lint, test)
     EnableQuality {
-        #[arg(long, help = "Commands to run (e.g., 'cargo fmt -- --check; cargo clippy')")]
+        #[arg(
+            long,
+            help = "Commands to run (e.g., 'cargo fmt -- --check; cargo clippy')"
+        )]
         commands: Option<String>,
         #[arg(long, help = "Fail fast on first error")]
         fail_fast: bool,
@@ -440,7 +443,11 @@ enum Cmd {
     Revert {
         #[arg(help = "Commit to revert")]
         commit: String,
-        #[arg(long, help = "For merge commits, specify which parent to use", value_name = "N")]
+        #[arg(
+            long,
+            help = "For merge commits, specify which parent to use",
+            value_name = "N"
+        )]
         mainline: Option<usize>,
         #[arg(long, help = "Don't create commit, just apply changes")]
         no_commit: bool,
@@ -1966,7 +1973,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Cmd::Add { paths, patch } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            
+
             if patch {
                 // Interactive patch mode
                 interactive_add(&s, &paths)?;
@@ -1974,7 +1981,9 @@ async fn main() -> anyhow::Result<()> {
                 // Regular add mode
                 if paths.is_empty() {
                     ctx.error("Nothing specified, nothing added.");
-                    ctx.info("💡 Tip: Use 'rune add <pathspec>...' to add files to the staging area");
+                    ctx.info(
+                        "💡 Tip: Use 'rune add <pathspec>...' to add files to the staging area",
+                    );
                     ctx.info("Examples:");
                     ctx.info("  rune add .              # Add all files in current directory");
                     ctx.info("  rune add src/           # Add all files in src/ directory");
@@ -2042,9 +2051,13 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Cmd::Commit { message, amend, no_edit } => {
+        Cmd::Commit {
+            message,
+            amend,
+            no_edit,
+        } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            
+
             if amend {
                 let c = s.commit_amend(&message, !no_edit, author())?;
                 Style::success(&format!(
@@ -2362,19 +2375,25 @@ async fn main() -> anyhow::Result<()> {
             } => {
                 println!("{}", "Hook configuration not yet implemented".yellow());
             }
-            HooksCmd::EnableQuality { commands, fail_fast } => {
+            HooksCmd::EnableQuality {
+                commands,
+                fail_fast,
+            } => {
                 enable_quality_hooks(commands.as_deref(), fail_fast)?;
             }
-            HooksCmd::EnableSecretScan { patterns_file, exclude } => {
+            HooksCmd::EnableSecretScan {
+                patterns_file,
+                exclude,
+            } => {
                 enable_secret_scan_hook(patterns_file.as_ref(), &exclude)?;
             }
         },
         Cmd::Workspace { cmd } => {
             commands::workspace::run(cmd)?;
-        },
+        }
         Cmd::Draft { args } => {
             commands::draft::execute_draft_command(args)?;
-        },
+        }
         Cmd::Sign { cmd } => match cmd {
             SignCmd::Setup { key } => {
                 commands::advanced::setup_gpg_signing(key)?;
@@ -2540,10 +2559,14 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Cmd::Revert { commit, mainline, no_commit } => {
+        Cmd::Revert {
+            commit,
+            mainline,
+            no_commit,
+        } => {
             let s = Store::discover(std::env::current_dir()?)?;
             let reverted_commit = s.revert_commit(&commit, mainline, no_commit, author())?;
-            
+
             if no_commit {
                 Style::success("Revert changes applied to working directory");
                 Style::info("Run 'rune commit' to complete the revert");
@@ -2691,32 +2714,32 @@ async fn main() -> anyhow::Result<()> {
 /// Interactive staging of file hunks
 fn interactive_add(store: &Store, paths: &[PathBuf]) -> anyhow::Result<()> {
     use std::io::{stdin, stdout};
-    
+
     Style::section_header("Interactive Staging");
-    
+
     let paths_to_process = if paths.is_empty() {
         // If no paths specified, find all modified files
         vec![PathBuf::from(".")]
     } else {
         paths.to_vec()
     };
-    
+
     for path in paths_to_process {
         let path_str = path.to_string_lossy();
-        
+
         // Skip if path doesn't exist
         if !path.exists() {
             Style::warning(&format!("Path does not exist: {}", path_str));
             continue;
         }
-        
+
         if path.is_dir() {
             Style::info(&format!("Processing directory: {}", path_str));
             // For directories, we'd need to recursively find files
             // For now, let's handle single files
             continue;
         }
-        
+
         // Read the current file content
         let current_content = match fs::read_to_string(&path) {
             Ok(content) => content,
@@ -2725,7 +2748,7 @@ fn interactive_add(store: &Store, paths: &[PathBuf]) -> anyhow::Result<()> {
                 continue;
             }
         };
-        
+
         // For interactive staging, we need to compare with the last committed version
         // This is a simplified implementation - in a real VCS this would be more complex
         let log = store.log();
@@ -2740,38 +2763,38 @@ fn interactive_add(store: &Store, paths: &[PathBuf]) -> anyhow::Result<()> {
         } else {
             String::new() // No commits yet
         };
-        
+
         // Generate simple hunks (in reality this would be much more sophisticated)
         let hunks = generate_hunks(&last_committed_content, &current_content);
-        
+
         if hunks.is_empty() {
             Style::info(&format!("No changes in {}", path_str));
             continue;
         }
-        
+
         println!("\nFile: {}", Style::file_path(&path_str));
-        
+
         for (i, hunk) in hunks.iter().enumerate() {
             println!("\n{}", "─".repeat(60).dimmed());
             println!("Hunk {}/{}", i + 1, hunks.len());
             println!("{}", hunk.display());
-            
+
             loop {
                 println!();
                 println!("Stage this hunk?");
                 println!("  y = yes, stage this hunk");
-                println!("  n = no, skip this hunk");  
+                println!("  n = no, skip this hunk");
                 println!("  e = edit hunk");
                 println!("  s = split hunk");
                 println!("  q = quit");
                 println!("  ? = help");
                 print!("Your choice: ");
                 stdout().flush()?;
-                
+
                 let mut input = String::new();
                 stdin().read_line(&mut input)?;
                 let choice = input.trim().to_lowercase();
-                
+
                 match choice.as_str() {
                     "y" | "yes" => {
                         // Stage this hunk
@@ -2814,7 +2837,7 @@ fn interactive_add(store: &Store, paths: &[PathBuf]) -> anyhow::Result<()> {
                 }
             }
         }
-        
+
         // After processing all hunks, stage the file
         // In a real implementation, we'd only stage the selected hunks
         match store.stage_file(&path_str) {
@@ -2826,7 +2849,7 @@ fn interactive_add(store: &Store, paths: &[PathBuf]) -> anyhow::Result<()> {
             }
         }
     }
-    
+
     Style::success("Interactive staging completed");
     Ok(())
 }
@@ -2843,15 +2866,16 @@ struct Hunk {
 impl Hunk {
     fn display(&self) -> String {
         let mut result = String::new();
-        result.push_str(&format!("@@ -{},{} +{},{} @@\n", 
-            self.old_start, self.old_count, 
-            self.new_start, self.new_count));
-        
+        result.push_str(&format!(
+            "@@ -{},{} +{},{} @@\n",
+            self.old_start, self.old_count, self.new_start, self.new_count
+        ));
+
         for line in &self.lines {
             result.push_str(line);
             result.push('\n');
         }
-        
+
         result
     }
 }
@@ -2859,33 +2883,33 @@ impl Hunk {
 fn generate_hunks(old_content: &str, new_content: &str) -> Vec<Hunk> {
     let old_lines: Vec<&str> = old_content.lines().collect();
     let new_lines: Vec<&str> = new_content.lines().collect();
-    
+
     // This is a very simplified diff algorithm
     // In reality, you'd use a proper diff algorithm like Myers
-    
+
     let mut hunks = Vec::new();
-    
+
     // Simple case: if content is completely different, create one big hunk
     if old_content != new_content {
         let mut lines = Vec::new();
-        
+
         // Add context lines (simplified)
         for (i, line) in old_lines.iter().enumerate() {
             if i < 3 {
                 lines.push(format!(" {}", line));
             }
         }
-        
+
         // Add removed lines
         for line in old_lines.iter().skip(3) {
             lines.push(format!("-{}", line));
         }
-        
+
         // Add added lines
         for line in new_lines.iter() {
             lines.push(format!("+{}", line));
         }
-        
+
         let hunk = Hunk {
             old_start: 1,
             old_count: old_lines.len(),
@@ -2893,62 +2917,63 @@ fn generate_hunks(old_content: &str, new_content: &str) -> Vec<Hunk> {
             new_count: new_lines.len(),
             lines,
         };
-        
+
         hunks.push(hunk);
     }
-    
+
     hunks
 }
 
 /// Blame/annotate a file to show line-by-line origin
 fn blame_file(store: &Store, file_path: &PathBuf, line_range: Option<&str>) -> anyhow::Result<()> {
     Style::section_header("Blame/Annotate");
-    
+
     let file_str = file_path.to_string_lossy();
-    
+
     // Check if file exists
     if !file_path.exists() {
         return Err(anyhow::anyhow!("File does not exist: {}", file_str));
     }
-    
+
     // Read current file content
     let current_content = fs::read_to_string(file_path)?;
     let lines: Vec<&str> = current_content.lines().collect();
-    
+
     // Parse line range if provided
     let (start_line, end_line) = if let Some(range) = line_range {
         parse_line_range(range, lines.len())?
     } else {
         (1, lines.len())
     };
-    
+
     println!("\nFile: {}", Style::file_path(&file_str));
     println!("{}", "─".repeat(80).dimmed());
-    
+
     // Get commit history for this file
     let log = store.log();
-    let file_commits: Vec<_> = log.iter()
+    let file_commits: Vec<_> = log
+        .iter()
         .filter(|commit| commit.files.contains(&file_str.to_string()))
         .collect();
-    
+
     if file_commits.is_empty() {
         Style::warning("No commits found for this file");
         return Ok(());
     }
-    
+
     // Blame each line (simplified implementation)
     for (line_num, line_content) in lines.iter().enumerate() {
         let actual_line_num = line_num + 1;
-        
+
         // Skip lines outside the requested range
         if actual_line_num < start_line || actual_line_num > end_line {
             continue;
         }
-        
+
         // Find the most recent commit that affected this line
         // This is a simplified algorithm - in reality, you'd need proper diff tracking
         let blame_commit = find_line_origin(&file_commits, line_content, actual_line_num);
-        
+
         let (commit_short, author_short, date_short) = if let Some(commit) = blame_commit {
             (
                 commit.id[..8].to_string(),
@@ -2956,9 +2981,13 @@ fn blame_file(store: &Store, file_path: &PathBuf, line_range: Option<&str>) -> a
                 format_timestamp(commit.time),
             )
         } else {
-            ("????????".to_string(), "unknown".to_string(), "????-??-??".to_string())
+            (
+                "????????".to_string(),
+                "unknown".to_string(),
+                "????-??-??".to_string(),
+            )
         };
-        
+
         // Format blame line
         println!(
             "{} {} {} {:4} {}",
@@ -2969,13 +2998,18 @@ fn blame_file(store: &Store, file_path: &PathBuf, line_range: Option<&str>) -> a
             line_content
         );
     }
-    
-    println!("\nShowing lines {}-{} of {}", start_line, end_line, lines.len());
-        
+
+    println!(
+        "\nShowing lines {}-{} of {}",
+        start_line,
+        end_line,
+        lines.len()
+    );
+
     if !file_commits.is_empty() {
         println!("File has {} commits in history", file_commits.len());
     }
-    
+
     Ok(())
 }
 
@@ -2985,34 +3019,37 @@ fn parse_line_range(range: &str, max_lines: usize) -> anyhow::Result<(usize, usi
         if parts.len() != 2 {
             return Err(anyhow::anyhow!("Invalid range format. Use start:end"));
         }
-        
-        let start: usize = parts[0].parse()
+
+        let start: usize = parts[0]
+            .parse()
             .map_err(|_| anyhow::anyhow!("Invalid start line number"))?;
-        let end: usize = parts[1].parse()
+        let end: usize = parts[1]
+            .parse()
             .map_err(|_| anyhow::anyhow!("Invalid end line number"))?;
-            
+
         if start < 1 || end < start || end > max_lines {
             return Err(anyhow::anyhow!("Line range out of bounds"));
         }
-        
+
         Ok((start, end))
     } else {
         // Single line number
-        let line: usize = range.parse()
+        let line: usize = range
+            .parse()
             .map_err(|_| anyhow::anyhow!("Invalid line number"))?;
-            
+
         if line < 1 || line > max_lines {
             return Err(anyhow::anyhow!("Line number out of bounds"));
         }
-        
+
         Ok((line, line))
     }
 }
 
 fn find_line_origin<'a>(
-    commits: &[&'a rune_core::Commit], 
-    _line_content: &str, 
-    _line_num: usize
+    commits: &[&'a rune_core::Commit],
+    _line_content: &str,
+    _line_num: usize,
 ) -> Option<&'a rune_core::Commit> {
     // Simplified: just return the most recent commit
     // In a real implementation, you'd track line changes through diffs
@@ -3023,28 +3060,28 @@ fn truncate_string(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         format!("{:width$}", s, width = max_len)
     } else {
-        format!("{}…", &s[..max_len-1])
+        format!("{}…", &s[..max_len - 1])
     }
 }
 
 fn format_timestamp(timestamp: i64) -> String {
     use chrono::{DateTime, Utc};
-    
-    let datetime = DateTime::from_timestamp(timestamp, 0)
-        .unwrap_or_else(|| Utc::now());
+
+    let datetime = DateTime::from_timestamp(timestamp, 0).unwrap_or_else(|| Utc::now());
     datetime.format("%Y-%m-%d").to_string()
 }
 
 /// Enable quality bundle hooks (format, lint, test)
 fn enable_quality_hooks(commands: Option<&str>, fail_fast: bool) -> anyhow::Result<()> {
     Style::section_header("Quality Bundle Setup");
-    
+
     let rune_dir = std::env::current_dir()?.join(".rune");
     let hooks_dir = rune_dir.join("hooks");
     fs::create_dir_all(&hooks_dir)?;
-    
-    let default_commands = commands.unwrap_or("cargo fmt -- --check; cargo clippy -- -D warnings; cargo test");
-    
+
+    let default_commands =
+        commands.unwrap_or("cargo fmt -- --check; cargo clippy -- -D warnings; cargo test");
+
     let hook_content = format!(
         r#"#!/bin/bash
 # Rune Quality Bundle Pre-commit Hook
@@ -3095,10 +3132,10 @@ echo "✓ All quality checks passed!"
         fail_fast,
         default_commands
     );
-    
+
     let hook_path = hooks_dir.join("pre-commit-quality");
     fs::write(&hook_path, hook_content)?;
-    
+
     // Make executable on Unix systems
     #[cfg(unix)]
     {
@@ -3107,43 +3144,50 @@ echo "✓ All quality checks passed!"
         perms.set_mode(0o755);
         fs::set_permissions(&hook_path, perms)?;
     }
-    
+
     // Create hook registry entry
     let registry_path = hooks_dir.join("registry.json");
-    let mut registry: std::collections::HashMap<String, serde_json::Value> = if registry_path.exists() {
-        let content = fs::read_to_string(&registry_path)?;
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        std::collections::HashMap::new()
-    };
-    
-    registry.insert("pre-commit-quality".to_string(), serde_json::json!({
-        "enabled": true,
-        "type": "pre-commit",
-        "description": "Quality bundle: format, lint, test",
-        "commands": default_commands,
-        "fail_fast": fail_fast,
-        "created": chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-    }));
-    
+    let mut registry: std::collections::HashMap<String, serde_json::Value> =
+        if registry_path.exists() {
+            let content = fs::read_to_string(&registry_path)?;
+            serde_json::from_str(&content).unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        };
+
+    registry.insert(
+        "pre-commit-quality".to_string(),
+        serde_json::json!({
+            "enabled": true,
+            "type": "pre-commit",
+            "description": "Quality bundle: format, lint, test",
+            "commands": default_commands,
+            "fail_fast": fail_fast,
+            "created": chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
+        }),
+    );
+
     fs::write(&registry_path, serde_json::to_string_pretty(&registry)?)?;
-    
+
     Style::success("Quality bundle hook enabled successfully");
     Style::info(&format!("Commands: {}", default_commands));
     Style::info(&format!("Fail fast: {}", fail_fast));
     Style::info("Hook will run on every commit");
-    
+
     Ok(())
 }
 
 /// Enable secret scanning pre-commit hook
-fn enable_secret_scan_hook(patterns_file: Option<&PathBuf>, exclude: &[String]) -> anyhow::Result<()> {
+fn enable_secret_scan_hook(
+    patterns_file: Option<&PathBuf>,
+    exclude: &[String],
+) -> anyhow::Result<()> {
     Style::section_header("Secret Scan Setup");
-    
+
     let rune_dir = std::env::current_dir()?.join(".rune");
     let hooks_dir = rune_dir.join("hooks");
     fs::create_dir_all(&hooks_dir)?;
-    
+
     // Default secret patterns
     let mut default_patterns = vec![
         r"(?i)(aws_access_key_id|aws_secret_access_key)\s*[:=]\s*[A-Z0-9]{20}".to_string(),
@@ -3153,7 +3197,7 @@ fn enable_secret_scan_hook(patterns_file: Option<&PathBuf>, exclude: &[String]) 
         r"(?i)(private_key|private-key).*BEGIN.*PRIVATE KEY".to_string(),
         r"(?i)(oauth|token)\s*[:=]\s*[A-Za-z0-9\-_]{20,}".to_string(),
     ];
-    
+
     // Load additional patterns if specified
     if let Some(patterns_path) = patterns_file {
         if patterns_path.exists() {
@@ -3165,14 +3209,17 @@ fn enable_secret_scan_hook(patterns_file: Option<&PathBuf>, exclude: &[String]) 
                 }
             }
         } else {
-            Style::warning(&format!("Patterns file not found: {}", patterns_path.display()));
+            Style::warning(&format!(
+                "Patterns file not found: {}",
+                patterns_path.display()
+            ));
         }
     }
-    
+
     let all_patterns = default_patterns;
-    
+
     let exclude_patterns = exclude.join("|");
-    
+
     let hook_content = format!(
         r#"#!/bin/bash
 # Rune Secret Scan Pre-commit Hook
@@ -3239,16 +3286,17 @@ fi
 echo "✓ No secrets detected"
 "#,
         chrono::Utc::now().format("%Y-%m-%d %H:%M:%S"),
-        all_patterns.iter()
+        all_patterns
+            .iter()
             .map(|p| format!("patterns+=('{}')", p.replace("'", "'\"'\"'")))
             .collect::<Vec<_>>()
             .join("\n"),
         exclude_patterns
     );
-    
+
     let hook_path = hooks_dir.join("pre-commit-secrets");
     fs::write(&hook_path, hook_content)?;
-    
+
     // Make executable on Unix systems
     #[cfg(unix)]
     {
@@ -3257,33 +3305,40 @@ echo "✓ No secrets detected"
         perms.set_mode(0o755);
         fs::set_permissions(&hook_path, perms)?;
     }
-    
+
     // Create hook registry entry
     let registry_path = hooks_dir.join("registry.json");
-    let mut registry: std::collections::HashMap<String, serde_json::Value> = if registry_path.exists() {
-        let content = fs::read_to_string(&registry_path)?;
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        std::collections::HashMap::new()
-    };
-    
-    registry.insert("pre-commit-secrets".to_string(), serde_json::json!({
-        "enabled": true,
-        "type": "pre-commit",
-        "description": "Secret scanning for leaked credentials",
-        "patterns_count": all_patterns.len(),
-        "exclude_patterns": exclude,
-        "created": chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-    }));
-    
+    let mut registry: std::collections::HashMap<String, serde_json::Value> =
+        if registry_path.exists() {
+            let content = fs::read_to_string(&registry_path)?;
+            serde_json::from_str(&content).unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        };
+
+    registry.insert(
+        "pre-commit-secrets".to_string(),
+        serde_json::json!({
+            "enabled": true,
+            "type": "pre-commit",
+            "description": "Secret scanning for leaked credentials",
+            "patterns_count": all_patterns.len(),
+            "exclude_patterns": exclude,
+            "created": chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
+        }),
+    );
+
     fs::write(&registry_path, serde_json::to_string_pretty(&registry)?)?;
-    
+
     Style::success("Secret scan hook enabled successfully");
-    Style::info(&format!("Monitoring {} secret patterns", all_patterns.len()));
+    Style::info(&format!(
+        "Monitoring {} secret patterns",
+        all_patterns.len()
+    ));
     if !exclude.is_empty() {
         Style::info(&format!("Excluding: {}", exclude.join(", ")));
     }
     Style::info("Hook will run on every commit");
-    
+
     Ok(())
 }

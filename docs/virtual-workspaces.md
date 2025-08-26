@@ -5,6 +5,7 @@ Rune's Virtual Workspace system provides Perforce-style client views and sparse 
 ## Overview
 
 Virtual workspaces allow you to:
+
 - **Focus on relevant code** – Only check out what you need
 - **Scale to large monorepos** – Work with massive codebases efficiently
 - **Maintain performance** – Automated guardrails prevent slowdowns
@@ -13,13 +14,17 @@ Virtual workspaces allow you to:
 ## Key Concepts
 
 ### Virtual Roots
+
 A virtual root defines a subset of the repository that should be active in your workspace. Each root has:
+
 - **Name** – A descriptive identifier (e.g., "frontend", "mobile")
 - **Pattern** – A glob pattern defining which files to include
 - **Status** – Active or inactive
 
 ### Performance Guardrails
+
 Automatic protection against:
+
 - **File count limits** – Prevent checking out too many files
 - **Size limits** – Block excessively large files
 - **Binary detection** – Warn about untracked binary files
@@ -182,6 +187,7 @@ Error: Workspace exceeds file limit (10,000 files)
 ```
 
 **Solutions:**
+
 1. Increase limits: `rune workspace limits --max-files 20000`
 2. Add more specific patterns to reduce scope
 3. Disable unnecessary virtual roots
@@ -193,6 +199,7 @@ Warning: Overlapping patterns detected
 ```
 
 **Solutions:**
+
 1. Review patterns with `rune workspace list`
 2. Make patterns more specific
 3. Use `rune workspace validate` to check for issues
@@ -204,6 +211,7 @@ Warning: Large workspace may impact performance
 ```
 
 **Solutions:**
+
 1. Review active virtual roots with `rune workspace list`
 2. Disable unused roots with `rune workspace toggle <name>`
 3. Use more targeted patterns
@@ -226,7 +234,7 @@ Workspaces store configuration in `.rune/workspace.json`:
     },
     {
       "name": "shared",
-      "pattern": "src/shared/**", 
+      "pattern": "src/shared/**",
       "active": true
     }
   ],

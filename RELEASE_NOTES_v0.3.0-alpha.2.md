@@ -8,6 +8,7 @@ This alpha release introduces Rune's Draft Commit system, providing Perforce-sty
 ## 🚀 New Features
 
 ### Draft Commits & Checkpoints
+
 - **Perforce-style Shelving** – Store work-in-progress changes as named drafts
 - **Checkpoint System** – Automatic or manual snapshots with timestamps
 - **Draft Management** – Create, apply, shelve, update, and delete drafts
@@ -15,6 +16,7 @@ This alpha release introduces Rune's Draft Commit system, providing Perforce-sty
 - **Automatic Cleanup** – Configurable cleanup policies for old drafts
 
 ### Draft Management Commands
+
 - `rune draft create <name>` – Create a new draft from working directory
 - `rune draft list [--tags] [--active]` – List drafts with filtering options
 - `rune draft apply <draft>` – Apply a draft to working directory
@@ -27,6 +29,7 @@ This alpha release introduces Rune's Draft Commit system, providing Perforce-sty
 - `rune draft tag/untag <draft> <tags>` – Manage draft tags
 
 ### Advanced Features
+
 - **JSON/Table Output** – Structured output formats for automation
 - **Draft Resolution** – Resolve drafts by name or partial ID
 - **Configuration Management** – Persistent settings for cleanup and defaults
@@ -36,12 +39,14 @@ This alpha release introduces Rune's Draft Commit system, providing Perforce-sty
 ## 🔧 Implementation Details
 
 ### New Crate: rune-draft
+
 - Complete draft commit management system
 - Persistent storage in `.rune/drafts/` directory
 - JSON-based configuration and draft storage
 - Integration with existing rune-store infrastructure
 
 ### CLI Integration
+
 - New `draft` subcommand with comprehensive argument support
 - Table and JSON output formats
 - Interactive confirmation prompts with `--force` override
@@ -50,6 +55,7 @@ This alpha release introduces Rune's Draft Commit system, providing Perforce-sty
 ## 📚 Documentation Updates
 
 ### New Features Documented
+
 - Draft workflow patterns and best practices
 - Checkpoint strategies for different development styles
 - Tag organization for team coordination
@@ -87,11 +93,13 @@ This alpha release completes **Tier 1 - Draft/Checkpoint Commits** functionality
 - ✅ CLI integration with all management commands
 
 ### Next: v0.3.0-alpha.3
+
 - Policy-as-code framework
 - Repository rules as configuration
 - Commit validation hooks
 
 ### Future: v0.4.0
+
 - Semantic merge system
 - AI-powered conflict resolution
 - Intelligent change graph
@@ -111,6 +119,7 @@ This alpha release completes **Tier 1 - Draft/Checkpoint Commits** functionality
 ---
 
 **Installation:**
+
 ```bash
 # From source (recommended for alpha)
 git clone <repository>
@@ -119,6 +128,7 @@ cargo build --release
 ```
 
 **Usage Examples:**
+
 ```bash
 # Create a draft
 rune draft create feature-work --description "Working on user authentication"
@@ -137,6 +147,7 @@ rune draft cleanup --keep-days 7
 ```
 
 **Next Steps:**
+
 - Try draft commits in your development workflow
 - Report issues and feedback
 - Follow development for alpha.3 features

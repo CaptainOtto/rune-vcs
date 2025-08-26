@@ -3,6 +3,7 @@
 Rune is a modern, minimal DVCS (distributed version control system) built for 2025 and beyond.
 
 ## Key Features
+
 - **Hybrid Git + P4 approach**
 - **Virtual Workspaces** – Perforce-style sparse checkout with client views
 - **Monorepo Support** – Virtual roots for scalable development
@@ -14,7 +15,9 @@ Rune is a modern, minimal DVCS (distributed version control system) built for 20
 - JSON API for UI integration
 
 ## Philosophy
+
 Rune is designed to be:
+
 - **Simple** – minimal commands for everyday use
 - **Fast** – optimized Rust backend
 - **Friendly** – clean CLI output, tab completions
