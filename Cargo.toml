@@ -17,7 +17,7 @@ members = [
 [workspace.package]
 edition = "2021"
 license = "Apache-2.0"
-version = "0.3.0-alpha.2"
+version = "0.3.0-alpha.3"
 authors = ["Rune Maintainers <dev@example.invalid>"]
 description = "Rune - A modern, intelligent version control system"
 homepage = "https://github.com/CaptainOtto/rune-vcs"
