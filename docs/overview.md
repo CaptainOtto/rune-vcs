@@ -4,8 +4,11 @@ Rune is a modern, minimal DVCS (distributed version control system) built for 20
 
 ## Key Features
 - **Hybrid Git + P4 approach**
+- **Virtual Workspaces** – Perforce-style sparse checkout with client views
+- **Monorepo Support** – Virtual roots for scalable development
 - Built-in **Large File Support (LFS)**
 - **Perforce-style file locking**
+- **Performance Guardrails** – Automated protection against large files/binaries
 - **Embedded mode** for plug-and-play local use
 - Cross-platform: macOS, Windows, Linux
 - JSON API for UI integration

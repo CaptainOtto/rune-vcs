@@ -32,6 +32,7 @@ rune-docs = { path = "../rune-docs" }
 rune-lfs = { path = "../rune-lfs" }
 rune-remote = { path = "../rune-remote" }
 rune-performance = { path = "../rune-performance" }
+rune-workspace = { path = "../rune-workspace" }
 axum = { workspace = true }
 
 rune-delta = { path = "../rune-delta" }

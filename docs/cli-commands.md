@@ -209,6 +209,61 @@ rune commit -m "Update player model"
 rune lfs unlock --path assets/player.fbx --owner designer@studio.com
 ```
 
+## Virtual Workspace Management
+
+### `rune workspace init [name]`
+
+Initialize a virtual workspace with sparse checkout.
+
+```bash
+rune workspace init mobile-app    # Named workspace
+rune workspace init               # Use current directory name
+```
+
+### `rune workspace add-root <path> <pattern>`
+
+Add a virtual root to focus on specific directories.
+
+```bash
+rune workspace add-root frontend "src/web/**"     # Web frontend only
+rune workspace add-root backend "src/api/**"      # API backend only
+rune workspace add-root mobile "src/mobile/**"    # Mobile app only
+```
+
+### `rune workspace toggle <name>`
+
+Toggle a virtual root on/off.
+
+```bash
+rune workspace toggle frontend    # Switch on/off
+```
+
+### `rune workspace list`
+
+Show configured virtual roots and their status.
+
+```bash
+rune workspace list
+```
+
+### `rune workspace validate`
+
+Check workspace configuration for issues.
+
+```bash
+rune workspace validate
+```
+
+### `rune workspace limits [--max-files <n>] [--max-size <size>]`
+
+Configure or view performance limits.
+
+```bash
+rune workspace limits                         # Show current limits
+rune workspace limits --max-files 5000       # Set file limit
+rune workspace limits --max-size 100MB       # Set size limit
+```
+
 ### Design Agency
 
 ```bash

@@ -1,0 +1,25 @@
+[package]
+name = "rune-workspace"
+version.workspace = true
+edition = "2021"
+license = "Apache-2.0"
+description = "Rune VCS - Virtual workspace and sparse checkout management"
+homepage = "https://github.com/CaptainOtto/rune-vcs"
+repository = "https://github.com/CaptainOtto/rune-vcs"
+documentation = "https://docs.rs/rune-workspace"
+keywords = ["vcs", "workspace", "sparse-checkout", "monorepo", "virtual"]
+categories = ["development-tools", "filesystem"]
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+glob = "0.3"
+walkdir = { workspace = true }
+blake3 = "1.5"
+tokio = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.0"
+tokio-test = "0.4"

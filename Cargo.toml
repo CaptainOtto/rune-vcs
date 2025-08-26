@@ -10,12 +10,13 @@ members = [
     "crates/rune-lfs",
     "crates/rune-remote",
     "crates/rune-docs",
+    "crates/rune-workspace",
 ]
 
 [workspace.package]
 edition = "2021"
 license = "Apache-2.0"
-version = "0.2.0"
+version = "0.3.0-alpha.1"
 authors = ["Rune Maintainers <dev@example.invalid>"]
 description = "Rune - A modern, intelligent version control system"
 homepage = "https://github.com/CaptainOtto/rune-vcs"

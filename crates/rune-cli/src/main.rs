@@ -569,6 +569,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: HooksCmd,
     },
+    /// Virtual workspace and sparse checkout management
+    Workspace {
+        #[command(subcommand)]
+        cmd: commands::workspace::WorkspaceCmd,
+    },
     /// GPG signing operations
     Sign {
         #[command(subcommand)]
@@ -2358,6 +2363,9 @@ async fn main() -> anyhow::Result<()> {
             HooksCmd::EnableSecretScan { patterns_file, exclude } => {
                 enable_secret_scan_hook(patterns_file.as_ref(), &exclude)?;
             }
+        },
+        Cmd::Workspace { cmd } => {
+            commands::workspace::run(cmd)?;
         },
         Cmd::Sign { cmd } => match cmd {
             SignCmd::Setup { key } => {
