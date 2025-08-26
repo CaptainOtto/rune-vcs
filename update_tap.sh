@@ -25,8 +25,8 @@ if [ ! -f "./release-macos/checksums.txt" ]; then
 fi
 
 # Extract checksums
-ARM64_FILE="rune-$VERSION-aarch64-apple-darwin.tar.gz"
-X64_FILE="rune-$VERSION-x86_64-apple-darwin.tar.gz"
+ARM64_FILE="rune-v$VERSION-aarch64-apple-darwin.tar.gz"
+X64_FILE="rune-v$VERSION-x86_64-apple-darwin.tar.gz"
 
 ARM64_SHA=$(grep "$ARM64_FILE" ./release-macos/checksums.txt | cut -d' ' -f1)
 X64_SHA=$(grep "$X64_FILE" ./release-macos/checksums.txt | cut -d' ' -f1)
@@ -60,13 +60,13 @@ cat > "Formula/rune-vcs.rb" << EOF
 class RuneVcs < Formula
   desc "Modern, intelligent version control system with virtual workspaces and draft commits"
   homepage "https://github.com/Johan-Ott/rune-vcs"
-  url "https://github.com/Johan-Ott/rune-vcs/releases/download/v$VERSION/rune-$VERSION-x86_64-apple-darwin.tar.gz"
+  url "https://github.com/Johan-Ott/rune-vcs/releases/download/v$VERSION/rune-v$VERSION-x86_64-apple-darwin.tar.gz"
   sha256 "$X64_SHA"
   license "Apache-2.0"
   version "$VERSION"
 
   on_arm do
-    url "https://github.com/Johan-Ott/rune-vcs/releases/download/v$VERSION/rune-$VERSION-aarch64-apple-darwin.tar.gz"
+    url "https://github.com/Johan-Ott/rune-vcs/releases/download/v$VERSION/rune-v$VERSION-aarch64-apple-darwin.tar.gz"
     sha256 "$ARM64_SHA"
   end
 

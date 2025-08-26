@@ -82,7 +82,7 @@ impl RuneContext {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "rune", version = "0.1.0", about = "Rune — modern DVCS (0.1.0)")]
+#[command(name = "rune", version = env!("CARGO_PKG_VERSION"), about = concat!("Rune — modern DVCS (", env!("CARGO_PKG_VERSION"), ")"))]
 struct Args {
     /// Enable verbose output with detailed information
     #[arg(short, long, global = true)]

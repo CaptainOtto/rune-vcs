@@ -45,11 +45,11 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -s /bin/bash rune
 
 # Copy the binary and completions
-COPY --from=builder /app/target/release/rune /usr/local/bin/rune
+COPY --from=builder /app/target/release/rune /usr/local/bin/rune-vcs
 COPY --from=builder /completions/ /usr/share/bash-completion/completions/
 
 # Set proper permissions
-RUN chmod +x /usr/local/bin/rune
+RUN chmod +x /usr/local/bin/rune-vcs
 
 # Create workspace directory
 RUN mkdir -p /workspace && chown rune:rune /workspace
@@ -66,10 +66,10 @@ ENV RUNE_DATA_HOME=/home/rune/.local/share/rune
 RUN mkdir -p $RUNE_CONFIG_HOME $RUNE_DATA_HOME
 
 # Verify installation (only run version as doctor might fail in container)
-RUN rune --version || true
+RUN rune-vcs --version || true
 
 # Default command
-CMD ["rune", "--help"]
+CMD ["rune-vcs", "--help"]
 
 # Labels for metadata
 LABEL org.opencontainers.image.title="Rune VCS"

@@ -14,19 +14,47 @@ rune-vcs är ett modernt versionshanteringssystem designat för att ersätta Git
 - 🚀 **Performance**: Smart delta compression, predictive caching
 - 🧠 **AI-Powered**: Intelligent repository analysis and insights
 - 📦 **LFS Built-in**: Automatic large file handling
-- 🔐 **Security**: GPG signing, audit trails
+- 🔐 **Security**: GPG signing, audit trails, secret scanning
 - 🌐 **Modern Protocol**: QUIC/HTTP3 support
 - 📊 **Analytics**: Built-in repository metrics
+- 🏗️ **Virtual Workspaces**: Focus on repository subsets for large projects
+- 📝 **Draft Commits**: Work-in-progress management with checkpoints
+- 🩹 **Interactive Staging**: Hunk-level staging with patch mode
+- 🔄 **Advanced Operations**: Amend, revert, rebase, cherry-pick
+- 🚫 **Smart Ignore**: Template-based ignore management with optimization
+- 📚 **Built-in Help**: Interactive tutorials, examples, and documentation
+- 🛠️ **Extensible**: Hooks, API server, shell completions
 
 ---
 
 ## 🚀 Installation
 
-### macOS (Homebrew)
+### macOS (Homebrew) - Recommended
 
 ```bash
 brew tap johan-ott/rune-vcs
 brew install rune-vcs
+```
+
+### Download Pre-built Binaries
+
+```bash
+brew tap johan-ott/rune-vcs
+brew install rune-vcs
+```
+
+### Download Pre-built Binaries
+
+```bash
+# Download for macOS ARM64 (Apple Silicon)
+curl -L -o rune-vcs.tar.gz https://github.com/Johan-Ott/rune-vcs/releases/download/v0.3.0-alpha.4/rune-v0.3.0-alpha.4-aarch64-apple-darwin.tar.gz
+
+# Download for macOS x86_64 (Intel)
+curl -L -o rune-vcs.tar.gz https://github.com/Johan-Ott/rune-vcs/releases/download/v0.3.0-alpha.4/rune-v0.3.0-alpha.4-x86_64-apple-darwin.tar.gz
+
+# Extract and install
+tar -xzf rune-vcs.tar.gz
+sudo cp rune /usr/local/bin/rune-vcs
 ```
 
 ### From Source
@@ -35,7 +63,20 @@ brew install rune-vcs
 git clone https://github.com/Johan-Ott/rune-vcs
 cd rune-vcs
 cargo build --release
-sudo cp target/release/rune /usr/local/bin/rune-vcs
+sudo cp target/release/rune-cli /usr/local/bin/rune-vcs
+```
+
+### Update Rune VCS
+
+```bash
+# Update via Homebrew
+brew upgrade rune-vcs
+
+# Check for updates
+rune-vcs update --check
+
+# Self-update (when implemented)
+rune-vcs update
 ```
 
 ### Verify Installation
@@ -69,9 +110,10 @@ rune-vcs config --global user.email "your.email@example.com"
 # Check status
 rune-vcs status
 
-# Add files
+# Add files (with interactive patch mode)
 rune-vcs add file.txt
 rune-vcs add .  # Add all files
+rune-vcs add --patch  # Interactive staging
 
 # Review changes
 rune-vcs diff
@@ -80,14 +122,182 @@ rune-vcs diff --staged
 # Commit changes
 rune-vcs commit -m "feat: add new feature"
 
+# Amend last commit
+rune-vcs commit --amend -m "feat: updated feature description"
+rune-vcs commit --amend --no-edit  # Keep same message
+
 # View history
 rune-vcs log
 rune-vcs log --oneline
+
+# Show specific commit details
+rune-vcs show <commit-hash>
+rune-vcs show HEAD
 ```
 
 ---
 
-## 🔄 Branch Management
+## � File Operations
+
+### Moving and Removing Files
+
+```bash
+# Move or rename files
+rune-vcs move old-file.txt new-file.txt
+rune-vcs move src/file.rs lib/file.rs
+
+# Remove files from working directory and staging
+rune-vcs remove file.txt
+rune-vcs remove --cached file.txt  # Remove from staging only
+
+# Show line-by-line file history (blame)
+rune-vcs blame file.txt
+rune-vcs blame --line-range 10:20 file.txt
+```
+
+### Reverting Changes
+
+```bash
+# Revert a specific commit
+rune-vcs revert <commit-hash>
+
+# Revert without creating a new commit
+rune-vcs revert --no-commit <commit-hash>
+
+# Revert merge commit (specify parent)
+rune-vcs revert --mainline 1 <merge-commit-hash>
+```
+
+### Reset Operations
+
+```bash
+# Reset staging area (keep working directory changes)
+rune-vcs reset
+
+# Reset to specific commit (keep working directory)
+rune-vcs reset <commit-hash>
+
+# Hard reset (DESTRUCTIVE - loses all changes)
+rune-vcs reset --hard HEAD
+
+# Reset specific files
+rune-vcs reset file.txt
+rune-vcs reset --hard file.txt
+```
+
+---
+
+## 📦 Draft Commits & Checkpoints
+
+Rune VCS includes a powerful draft system for managing work-in-progress changes and creating checkpoints.
+
+### Creating and Managing Drafts
+
+```bash
+# Create a draft from current changes
+rune-vcs draft create "work in progress on auth module"
+
+# List all drafts
+rune-vcs draft list
+
+# Show draft details
+rune-vcs draft show <draft-id>
+
+# Apply a draft to working directory
+rune-vcs draft apply <draft-id>
+
+# Update existing draft with current changes
+rune-vcs draft update <draft-id>
+
+# Shelve (temporarily store) active changes
+rune-vcs draft shelve <draft-id>
+```
+
+### Draft Tagging and Organization
+
+```bash
+# Add tags to drafts for organization
+rune-vcs draft tag <draft-id> "feature" "auth" "wip"
+
+# Remove tags
+rune-vcs draft untag <draft-id> "wip"
+
+# Delete drafts
+rune-vcs draft delete <draft-id>
+
+# Clean up old drafts
+rune-vcs draft cleanup --older-than 30d
+```
+
+### Automatic Checkpoints
+
+```bash
+# Create automatic checkpoint
+rune-vcs draft checkpoint
+
+# Configure automatic checkpointing
+rune-vcs config draft.auto-checkpoint true
+rune-vcs config draft.checkpoint-interval 1h
+```
+
+---
+
+## 🏗️ Virtual Workspaces
+
+Virtual workspaces allow you to work with subsets of large repositories efficiently.
+
+### Workspace Setup
+
+```bash
+# Initialize virtual workspace
+rune-vcs workspace init
+
+# Add virtual roots (focus areas)
+rune-vcs workspace add-root src/frontend
+rune-vcs workspace add-root docs/
+
+# List virtual roots
+rune-vcs workspace list
+
+# Remove virtual root
+rune-vcs workspace remove-root src/frontend
+```
+
+### Workspace Management
+
+```bash
+# Toggle virtual root active/inactive
+rune-vcs workspace toggle src/backend
+
+# View current workspace (what files are included)
+rune-vcs workspace view
+
+# Add global include patterns
+rune-vcs workspace include "*.rs" "*.toml"
+
+# Add global exclude patterns
+rune-vcs workspace exclude "target/" "*.tmp"
+```
+
+### Performance Controls
+
+```bash
+# Validate workspace against performance limits
+rune-vcs workspace validate
+
+# Configure performance limits
+rune-vcs workspace limits --max-files 10000
+rune-vcs workspace limits --max-size 1GB
+
+# Check workspace performance
+rune-vcs workspace limits --show
+```
+
+**Note**: Advanced performance guardrails, policy-as-code enforcement, and other enterprise features are planned for future releases.
+
+---
+
+## �🔄 Branch Management
 
 ### Creating and Switching Branches
 
@@ -167,7 +377,91 @@ rune-vcs push --all origin
 
 ---
 
-## 📦 Large File Support (LFS)
+## 🩹 Patch Management
+
+### Creating and Applying Patches
+
+```bash
+# Create patch from changes
+rune-vcs patch create --range HEAD~2..HEAD
+
+# Apply patch file
+rune-vcs patch apply changes.patch
+
+# Interactive staging (patch mode)
+rune-vcs add --patch  # Choose hunks interactively
+```
+
+---
+
+## � Advanced Ignore Management
+
+### Ignore Operations
+
+```bash
+# Check if a file would be ignored
+rune-vcs ignore check --debug file.txt
+
+# Add patterns to ignore file
+rune-vcs ignore add "*.log" "temp/"
+rune-vcs ignore add --global "*.DS_Store"
+
+# List current ignore rules
+rune-vcs ignore list
+rune-vcs ignore list --templates
+
+# Apply project templates
+rune-vcs ignore templates  # Show available templates
+rune-vcs ignore apply rust  # Apply Rust project template
+rune-vcs ignore apply node  # Apply Node.js template
+
+# Initialize smart ignore configuration
+rune-vcs ignore init
+rune-vcs ignore init --force
+
+# Optimize ignore rules
+rune-vcs ignore optimize
+rune-vcs ignore optimize --dry-run
+```
+
+---
+
+## 📚 Documentation and Help
+
+### Getting Help
+
+```bash
+# General help
+rune-vcs help
+rune-vcs --help
+
+# Command-specific help
+rune-vcs help commit
+rune-vcs commit --help
+
+# Documentation
+rune-vcs docs view <topic>
+rune-vcs docs search <query>
+rune-vcs docs serve --open  # Start local docs server
+rune-vcs docs list
+
+# Examples
+rune-vcs examples list
+rune-vcs examples category workflow
+rune-vcs examples search "branch"
+rune-vcs examples show "feature-branch"
+
+# Tutorial
+rune-vcs tutorial basics
+rune-vcs tutorial branching
+rune-vcs tutorial collaboration
+rune-vcs tutorial advanced
+rune-vcs tutorial list
+```
+
+---
+
+## �📦 Large File Support (LFS)
 
 ### Automatic LFS
 
@@ -429,6 +723,28 @@ rune-vcs repair
 
 ---
 
+## 📈 Release Information
+
+### Current Release: v0.3.0-alpha.4
+
+**Alpha Release Notice**: This is an alpha version for testing and feedback. While functional, it's not recommended for production use.
+
+#### What's New in 0.3.0-alpha.4
+- ✅ Complete Homebrew integration with `johan-ott/rune-vcs` tap
+- ✅ Consistent binary naming (`rune-vcs` command)
+- ✅ Pre-built macOS binaries (ARM64 + x86_64)
+- ✅ Modernized CI/CD pipeline with GitHub Actions
+- ✅ Docker containerization support
+- ✅ Local build and test automation
+- ✅ Comprehensive documentation updates
+
+#### Download Options
+- **Homebrew**: `brew install rune-vcs` (recommended)
+- **Direct Download**: GitHub releases with SHA256 verification
+- **From Source**: Cargo build with Rust toolchain
+
+---
+
 ## 📈 Performance Features
 
 ### Smart Caching
@@ -579,19 +895,38 @@ rune-vcs compare-with-git
 
 ### Git Compatibility
 
-| Git Command           | Rune VCS Equivalent        |
-| --------------------- | -------------------------- |
-| `git init`            | `rune-vcs init`            |
-| `git add .`           | `rune-vcs add .`           |
-| `git commit -m "msg"` | `rune-vcs commit -m "msg"` |
-| `git status`          | `rune-vcs status`          |
-| `git log`             | `rune-vcs log`             |
-| `git branch`          | `rune-vcs branch`          |
-| `git checkout`        | `rune-vcs checkout`        |
-| `git merge`           | `rune-vcs merge`           |
-| `git push`            | `rune-vcs push`            |
-| `git pull`            | `rune-vcs pull`            |
-| `git clone`           | `rune-vcs clone`           |
+| Git Command               | Rune VCS Equivalent           | Notes                          |
+| ------------------------- | ----------------------------- | ------------------------------ |
+| `git init`                | `rune-vcs init`               |                                |
+| `git add .`               | `rune-vcs add .`              |                                |
+| `git add -p`              | `rune-vcs add --patch`        | Interactive staging            |
+| `git commit -m "msg"`     | `rune-vcs commit -m "msg"`    |                                |
+| `git commit --amend`      | `rune-vcs commit --amend`     | Amend last commit              |
+| `git status`              | `rune-vcs status`             |                                |
+| `git log`                 | `rune-vcs log`                |                                |
+| `git show`                | `rune-vcs show`               | Show commit details            |
+| `git blame`               | `rune-vcs blame`              | Line-by-line file history      |
+| `git branch`              | `rune-vcs branch`             |                                |
+| `git checkout`            | `rune-vcs checkout`           |                                |
+| `git merge`               | `rune-vcs merge`              |                                |
+| `git revert`              | `rune-vcs revert`             | With --mainline support       |
+| `git reset`               | `rune-vcs reset`              | Soft/hard reset modes          |
+| `git rm`                  | `rune-vcs remove`             | Remove files                   |
+| `git mv`                  | `rune-vcs move`               | Move/rename files              |
+| `git stash`               | `rune-vcs stash`              |                                |
+| `git cherry-pick`         | `rune-vcs cherry-pick`        |                                |
+| `git rebase`              | `rune-vcs rebase`             |                                |
+| `git push`                | `rune-vcs push`               |                                |
+| `git pull`                | `rune-vcs pull`               |                                |
+| `git clone`               | `rune-vcs clone`              |                                |
+| `git fetch`               | `rune-vcs fetch`              |                                |
+| `git diff`                | `rune-vcs diff`               |                                |
+| `git submodule`           | `rune-vcs submodule`          |                                |
+| `git config`              | `rune-vcs config`             |                                |
+| _N/A_                     | `rune-vcs draft`              | 🆕 Draft commits & checkpoints |
+| _N/A_                     | `rune-vcs workspace`          | 🆕 Virtual workspaces          |
+| _N/A_                     | `rune-vcs intelligence`       | 🆕 AI-powered analysis         |
+| _N/A_                     | `rune-vcs doctor`             | 🆕 System diagnostics          |
 
 ---
 
@@ -680,7 +1015,9 @@ rune-vcs push origin main --tags
 
 ## 📊 Performance Monitoring
 
-### Performance Statistics
+**Note**: These commands are planned for future releases. Current version includes basic performance optimizations.
+
+### Performance Statistics (Planned)
 
 ```bash
 # Repository performance overview
@@ -696,7 +1033,7 @@ rune-vcs performance memory
 rune-vcs performance network
 ```
 
-### Optimization
+### Optimization (Planned)
 
 ```bash
 # Optimize repository for performance
@@ -745,6 +1082,7 @@ rune-vcs profile
 - **Documentation**: `rune-vcs docs`
 - **Issues**: https://github.com/Johan-Ott/rune-vcs/issues
 - **Releases**: https://github.com/Johan-Ott/rune-vcs/releases
+- **Homebrew Tap**: https://github.com/Johan-Ott/homebrew-rune-vcs
 
 ### Community
 
@@ -761,4 +1099,4 @@ MIT License - see LICENSE file for details.
 ---
 
 _Last updated: 2025-08-26_  
-_Rune VCS version: 0.2.5_
+_Rune VCS version: 0.3.0-alpha.4_
