@@ -1092,6 +1092,75 @@ rune-vcs profile
 
 ---
 
+## 🧭 Next Steps & Roadmap (Planned / Not Yet Implemented)
+
+The following capabilities are referenced in vision, docs, or design notes but are NOT yet implemented in the current release (v0.3.0-alpha.4). They are candidates for upcoming alpha milestones.
+
+### 1. Performance Guardrails & Commit Constraints
+- Automatic enforcement of workspace performance limits (current: only manual workspace limits commands)
+- Commit size / changed-file thresholds with warnings or blocks
+- Time-to-index budget enforcement per operation
+- Predictive prefetch + adaptive caching heuristics toggles
+
+### 2. Policy-as-Code
+- `rune-vcs policy` command group for listing, testing, and enforcing policies
+- Configurable repository rules (branch protections, required labels, file path restrictions)
+- Extensible policy engine (Rego / WASM based) for custom org rules
+- Built-in conventional commit validation (currently only achievable via hooks)
+
+### 3. Structured Changelog Generation
+- `rune-vcs changelog generate` for Conventional Commit parsing
+- Release note templating & grouping (feat/fix/perf/chore/breaking)
+- Automatic linking to issues / PRs
+- Ability to diff changelog between two refs
+
+### 4. Impact-Based Test Selection
+- `rune-vcs test` wrapper integrating dependency graph + file ↔ test mapping
+- Change impact analyzer suggesting minimal test set
+- Historical flake tracking & quarantine suggestions
+- Coverage delta reporting per draft / commit
+
+### 5. Intelligent Change Graph Visualization
+- `rune-vcs graph` to render commit / draft / workspace dependency graph
+- Hotspot & risk surface overlays (AI-assisted)
+- Focus mode: collapse unrelated subgraphs
+- Export to JSON / SVG
+
+### 6. Supply Chain & Dependency Diff Scanning
+- `rune-vcs deps scan` for third-party manifest inventory
+- Version drift detection & security advisory cross-referencing
+- SBOM generation (CycloneDX / SPDX)
+- Upgrade impact simulation report
+
+### 7. Pluggable Storage Backend Abstraction
+- `rune-vcs storage` command for listing / switching backends
+- Local FS, object store (S3/GCS), and embedded KV modes
+- Content tiering (hot vs archival)
+- Encryption at rest per backend
+
+### 8. Encrypted Path Subsets
+- `rune-vcs encrypt path/` to selectively encrypt directories
+- Secure key management (local KMS plugin architecture)
+- Policy requiring encryption for classified paths
+- Auditable access attempts & decryption events
+
+### 9. Additional Enterprise Features (Exploratory)
+- SLA-aware replication scheduling
+- Multi-tenant namespace isolation
+- AI risk scoring for incoming patches
+- Merge queue with automated validation pipeline
+
+### Status Legend Proposal
+(Will appear once features begin rolling out.)
+- ⏳ Planned
+- 🔨 In Progress
+- 🧪 Experimental (flagged)
+- ✅ Implemented
+
+> Contributions or feedback on prioritization are welcome via Issues / Discussions.
+
+---
+
 ## 📄 License
 
 MIT License - see LICENSE file for details.
