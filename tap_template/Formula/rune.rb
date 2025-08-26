@@ -1,43 +1,23 @@
+class Rune < Formula
+  desc "Modern, intelligent version control system"
+  homepage "https://github.com/Johan-Ott/rune-vcs"
+  url "https://github.com/Johan-Ott/rune-vcs/releases/download/v0.3.0-alpha.4/rune-0.3.0-alpha.4-x86_64-apple-darwin.tar.gz"
+  sha256 "02a35b8277bcb52872c65b38709ba0aba5bc59dcbadf1a9693c61d2b71a55fd8"
+  license "Apache-2.0"
+  version "0.3.0-alpha.4"
 
-# Create a repo like CaptainOtto/homebrew-tap and place this file there.
-class Rune < Formula
-  desc "Rune — modern DVCS"
-  homepage "https://github.com/CaptainOtto/rune-vcs"
-  version "v0.0.2"
-  on_macos do
-    if Hardware::CPU.arm?
-      url "https://github.com/CaptainOtto/rune-vcs/releases/download/v0.0.2/rune-v0.0.2-aarch64-apple-darwin.tar.gz"
-      sha256 "REPLACE_ME"
-    else
-      url "https://github.com/CaptainOtto/rune-vcs/releases/download/v0.0.2/rune-v0.0.2-x86_64-apple-darwin.tar.gz"
-      sha256 "REPLACE_ME"
-    end
+  on_arm do
+    url "https://github.com/Johan-Ott/rune-vcs/releases/download/v0.3.0-alpha.4/rune-0.3.0-alpha.4-aarch64-apple-darwin.tar.gz"
+    sha256 "402c9e99320e4452d9ddaa5aff6b8a2134fef31e3649d0cfd3caa807534ef0bd"
   end
-  on_linux do
-    url "https://github.com/CaptainOtto/rune-vcs/releases/download/v0.0.2/rune-v0.0.2-x86_64-unknown-linux-gnu.tar.gz"
-    sha256 "REPLACE_ME"
-  endke CaptainOtto/homebrew-tap and place this file there.
-class Rune < Formula
-  desc "Rune — modern DVCS"
-  homepage "https://github.com/CaptainOtto/rune-vcs"
-  version "v0.0.1"
-  on_macos do
-    if Hardware::CPU.arm?
-      url "https://github.com/CaptainOtto/rune-vcs/releases/download/v0.0.1/rune-v0.0.1-aarch64-apple-darwin.tar.gz"
-      sha256 "REPLACE_ME"
-    else
-      url "https://github.com/CaptainOtto/rune-vcs/releases/download/v0.0.1/rune-v0.0.1-x86_64-apple-darwin.tar.gz"
-      sha256 "REPLACE_ME"
-    end
-  end
-  on_linux do
-    url "https://github.com/CaptainOtto/rune-vcs/releases/download/v0.0.1/rune-v0.0.1-x86_64-unknown-linux-gnu.tar.gz"
-    sha256 "REPLACE_ME"
-  end
+
+  depends_on "rust" => :build
+
   def install
     bin.install "rune"
-    bash_completion.install "rune.bash" => "rune"
-    zsh_completion.install "rune.zsh" => "_rune"
-    fish_completion.install "rune.fish"
+  end
+
+  test do
+    system "#{bin}/rune", "--version"
   end
 end
