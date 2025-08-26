@@ -483,8 +483,244 @@ impl Store {
         writeln!(f, "{}", serde_json::to_string(&c)?)?;
         self.write_ref(&branch, &id)?;
         self.write_index(&Index::default())?;
+        
+        // Update reflog entry
+        self.update_reflog(&branch, &id, &format!("commit: {}", msg))?;
+        
         Ok(c)
     }
+
+    pub fn commit_amend(&self, msg: &str, edit_message: bool, author: Author) -> Result<Commit> {
+        let idx = self.read_index()?;
+        let mut log = self.log();
+        
+        if log.is_empty() {
+            anyhow::bail!("no commits to amend");
+        }
+        
+        // Check if merge is in progress
+        if self.rune_dir.join("MERGE_HEAD").exists() {
+            anyhow::bail!("cannot amend during merge");
+        }
+        
+        let last_commit = &log[0];
+        let branch = self.head_ref();
+        
+        // Use provided message if edit_message is true, otherwise keep original
+        let commit_message = if edit_message {
+            msg.to_string()
+        } else {
+            last_commit.message.clone()
+        };
+        
+        // If index is empty, use files from last commit
+        let files = if idx.entries.is_empty() {
+            last_commit.files.clone()
+        } else {
+            idx.entries.keys().cloned().collect::<Vec<_>>()
+        };
+        
+        // Create new commit hash
+        let hash = blake3::hash(
+            format!(
+                "{}{}{:?}{}",
+                commit_message,
+                author.email,
+                files,
+                Utc::now().timestamp()
+            )
+            .as_bytes(),
+        );
+        let id = hex::encode(hash.as_bytes());
+        
+        // Create amended commit with same parent as original
+        let amended_commit = Commit {
+            id: id.clone(),
+            message: commit_message.clone(),
+            author,
+            time: Utc::now().timestamp(),
+            parent: last_commit.parent.clone(),
+            files,
+            branch: branch.clone(),
+        };
+        
+        // Remove the last commit from log and add amended commit
+        log.remove(0);
+        log.insert(0, amended_commit.clone());
+        
+        // Rewrite the entire log file
+        let log_path = self.rune_dir.join("log.jsonl");
+        fs::remove_file(&log_path).ok(); // Remove old log
+        
+        let mut f = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&log_path)?;
+        
+        for commit in log.iter().rev() {
+            writeln!(f, "{}", serde_json::to_string(commit)?)?;
+        }
+        
+        // Update branch ref to point to amended commit
+        self.write_ref(&branch, &id)?;
+        
+        // Clear index if it had changes
+        if !idx.entries.is_empty() {
+            self.write_index(&Index::default())?;
+        }
+        
+        // Update reflog entry
+        self.update_reflog(&branch, &id, &format!("commit (amend): {}", commit_message))?;
+        
+        Ok(amended_commit)
+    }
+
+    fn update_reflog(&self, ref_name: &str, commit_id: &str, message: &str) -> Result<()> {
+        let reflog_dir = self.rune_dir.join("logs");
+        fs::create_dir_all(&reflog_dir)?;
+        
+        let reflog_path = reflog_dir.join(ref_name.replace("/", "_"));
+        let mut f = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(reflog_path)?;
+        
+        writeln!(f, "{} {} {}", 
+            Utc::now().timestamp(), 
+            commit_id, 
+            message
+        )?;
+        
+        Ok(())
+    }
+
+    pub fn revert_commit(&self, commit_id: &str, mainline: Option<usize>, no_commit: bool, author: Author) -> Result<Commit> {
+        let log = self.log();
+        
+        // Find the commit to revert
+        let target_commit = log.iter()
+            .find(|c| c.id == commit_id || c.id.starts_with(commit_id))
+            .ok_or_else(|| anyhow::anyhow!("commit '{}' not found", commit_id))?;
+        
+        // Check if it's a merge commit and handle mainline
+        if target_commit.parent.is_some() && mainline.is_some() {
+            // TODO: Handle merge commits with multiple parents
+            // For now, we'll treat it as a regular commit
+        }
+        
+        // Get the parent commit to see what was there before
+        let parent_files = if let Some(ref parent_id) = target_commit.parent {
+            log.iter()
+                .find(|c| c.id == *parent_id)
+                .map(|c| c.files.clone())
+                .unwrap_or_default()
+        } else {
+            Vec::new() // If no parent, this was the initial commit
+        };
+        
+        // Create inverse changes:
+        // 1. Files that were added in target_commit should be removed
+        // 2. Files that were removed in target_commit should be restored
+        // 3. Files that were modified should be reverted to parent state
+        
+        let mut revert_files = Vec::new();
+        let mut staged_files = std::collections::BTreeMap::new();
+        
+        // Files in target commit that weren't in parent = added files (should be removed)
+        for file in &target_commit.files {
+            if !parent_files.contains(file) {
+                // This file was added, so we remove it in revert
+                let file_path = self.root.join(file);
+                if file_path.exists() {
+                    fs::remove_file(&file_path).ok();
+                }
+            } else {
+                // This file was modified, we need to restore parent version
+                // For now, we'll just mark it as needing attention
+                revert_files.push(file.clone());
+                // Stage the current state for the revert commit
+                let metadata = fs::metadata(self.root.join(file))?;
+                staged_files.insert(file.clone(), metadata.modified()?.duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64);
+            }
+        }
+        
+        // Files in parent that aren't in target = removed files (should be restored)
+        for file in &parent_files {
+            if !target_commit.files.contains(file) {
+                // This file was removed, we need to restore it
+                // For now, create a placeholder
+                let file_path = self.root.join(file);
+                if let Some(parent_dir) = file_path.parent() {
+                    fs::create_dir_all(parent_dir)?;
+                }
+                fs::write(&file_path, format!("# Restored file: {}\n", file))?;
+                revert_files.push(file.clone());
+                let metadata = fs::metadata(&file_path)?;
+                staged_files.insert(file.clone(), metadata.modified()?.duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64);
+            }
+        }
+        
+        if no_commit {
+            // Just apply changes to working directory and index
+            let index = Index { entries: staged_files };
+            self.write_index(&index)?;
+            return Ok(Commit {
+                id: "no-commit".to_string(),
+                message: format!("Revert \"{}\"", target_commit.message),
+                author,
+                time: Utc::now().timestamp(),
+                parent: None,
+                files: revert_files,
+                branch: self.head_ref(),
+            });
+        }
+        
+        // Create revert commit
+        let revert_message = format!("Revert \"{}\"", target_commit.message);
+        let branch = self.head_ref();
+        let branch_head = self.read_ref(&branch);
+        
+        let hash = blake3::hash(
+            format!(
+                "{}{}{:?}{}",
+                revert_message,
+                author.email,
+                revert_files,
+                Utc::now().timestamp()
+            )
+            .as_bytes(),
+        );
+        let id = hex::encode(hash.as_bytes());
+        
+        let revert_commit = Commit {
+            id: id.clone(),
+            message: revert_message.clone(),
+            author,
+            time: Utc::now().timestamp(),
+            parent: branch_head,
+            files: revert_files,
+            branch: branch.clone(),
+        };
+        
+        // Add to log
+        let mut f = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.rune_dir.join("log.jsonl"))?;
+        writeln!(f, "{}", serde_json::to_string(&revert_commit)?)?;
+        
+        // Update branch ref
+        self.write_ref(&branch, &id)?;
+        
+        // Clear index
+        self.write_index(&Index::default())?;
+        
+        // Update reflog
+        self.update_reflog(&branch, &id, &format!("revert: {}", target_commit.message))?;
+        
+        Ok(revert_commit)
+    }
+
     pub fn log(&self) -> Vec<Commit> {
         let p = self.rune_dir.join("log.jsonl");
         if !p.exists() {

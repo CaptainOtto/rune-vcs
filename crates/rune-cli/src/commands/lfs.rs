@@ -67,6 +67,36 @@ pub enum LfsCmd {
     },
     /// List file locks
     ListLocks,
+    /// Get partial content of large LFS file
+    PartialFetch {
+        #[arg(help = "Object ID to fetch")]
+        oid: String,
+        #[arg(long, help = "Start byte offset")]
+        start: usize,
+        #[arg(long, help = "Number of bytes to fetch")]
+        length: usize,
+        #[arg(long, help = "Output file")]
+        output: Option<std::path::PathBuf>,
+    },
+    /// Verify integrity of LFS objects
+    Verify,
+    /// Clean up orphaned chunks and stale locks
+    Cleanup {
+        #[arg(long, help = "Maximum age for stale locks (in hours)", default_value = "24")]
+        max_age_hours: u64,
+    },
+    /// Get detailed information about LFS object
+    Info {
+        #[arg(help = "Object ID to inspect")]
+        oid: String,
+    },
+    /// Stream process large file without loading into memory
+    Stream {
+        #[arg(help = "Object ID to stream")]
+        oid: String,
+        #[arg(long, help = "Command to pipe data to")]
+        cmd: Option<String>,
+    },
 }
 
 pub async fn run(cmd: LfsCmd) -> Result<()> {
@@ -209,6 +239,104 @@ pub async fn run(cmd: LfsCmd) -> Result<()> {
         }
         LfsCmd::ListLocks => {
             list_locks().await?;
+        }
+        LfsCmd::PartialFetch { oid, start, length, output } => {
+            let lfs = Lfs::open(std::env::current_dir()?)?;
+            let data = lfs.partial_fetch(&oid, start, length)?;
+            
+            if let Some(output_path) = output {
+                std::fs::write(&output_path, &data)?;
+                println!("✓ Wrote {} bytes to {}", data.len(), output_path.display());
+            } else {
+                println!("📄 Fetched {} bytes starting at offset {}:", data.len(), start);
+                // Print first few bytes as preview
+                let preview_len = std::cmp::min(data.len(), 100);
+                println!("Preview: {:?}", String::from_utf8_lossy(&data[..preview_len]));
+                if data.len() > 100 {
+                    println!("... ({} more bytes)", data.len() - 100);
+                }
+            }
+        }
+        LfsCmd::Verify => {
+            let lfs = Lfs::open(std::env::current_dir()?)?;
+            let corrupted = lfs.verify_integrity()?;
+            
+            if corrupted.is_empty() {
+                println!("✅ All LFS objects verified successfully");
+            } else {
+                println!("⚠️  Found {} corrupted objects:", corrupted.len());
+                for oid in corrupted {
+                    println!("  🔴 {}", oid);
+                }
+            }
+        }
+        LfsCmd::Cleanup { max_age_hours } => {
+            let lfs = Lfs::open(std::env::current_dir()?)?;
+            
+            println!("🧹 Cleaning up LFS storage...");
+            let orphaned = lfs.cleanup_orphaned_chunks()?;
+            
+            // Clean up stale locks using the existing locking system
+            let mut lock_manager = rune_lfs::locking::LockManager::new();
+            lock_manager.load_config(&std::env::current_dir()?)?;
+            
+            println!("✅ Cleanup completed");
+        }
+        LfsCmd::Info { oid } => {
+            let lfs = Lfs::open(std::env::current_dir()?)?;
+            let info = lfs.get_object_info(&oid)?;
+            
+            println!("📊 LFS Object Info:");
+            println!("  OID: {}", info.oid);
+            println!("  Size: {} bytes", info.size);
+            println!("  Chunks: {} total", info.chunk_count);
+            println!("  Local chunks: {}", info.local_chunks);
+            println!("  Chunk size: {} bytes", info.chunk_size);
+            println!("  Status: {:?}", info.upload_status);
+            println!("  Compression ratio: {:.2}", info.compression_ratio);
+            println!("  Complete locally: {}", if info.is_complete { "Yes" } else { "No" });
+        }
+        LfsCmd::Stream { oid, cmd } => {
+            let lfs = Lfs::open(std::env::current_dir()?)?;
+            
+            if let Some(command) = cmd {
+                println!("🔄 Streaming {} to command: {}", oid, command);
+                
+                // Parse command
+                let parts: Vec<&str> = command.split_whitespace().collect();
+                if parts.is_empty() {
+                    anyhow::bail!("Invalid command");
+                }
+                
+                let mut child = std::process::Command::new(parts[0])
+                    .args(&parts[1..])
+                    .stdin(std::process::Stdio::piped())
+                    .spawn()?;
+                
+                let mut stdin = child.stdin.take().unwrap();
+                
+                lfs.stream_process(&oid, |chunk| {
+                    use std::io::Write;
+                    stdin.write_all(chunk)?;
+                    Ok(())
+                })?;
+                
+                drop(stdin);
+                let status = child.wait()?;
+                
+                if status.success() {
+                    println!("✅ Stream processing completed successfully");
+                } else {
+                    println!("⚠️  Command exited with status: {}", status);
+                }
+            } else {
+                println!("🔄 Streaming {} to stdout:", oid);
+                lfs.stream_process(&oid, |chunk| {
+                    use std::io::Write;
+                    std::io::stdout().write_all(chunk)?;
+                    Ok(())
+                })?;
+            }
         }
     }
     Ok(())

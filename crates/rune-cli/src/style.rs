@@ -58,6 +58,11 @@ impl Style {
         path.cyan()
     }
 
+    /// Print an author name with styling
+    pub fn author_name(name: &str) -> ColoredString {
+        name.magenta()
+    }
+
     /// Print a status indicator
     pub fn status_added() -> ColoredString {
         "+".green().bold()
