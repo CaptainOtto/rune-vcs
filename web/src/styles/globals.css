@@ -1,0 +1,264 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 14px;
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Kodex Light Theme (Minimal usage) */
+  --background: #f8fafc;
+  --foreground: #0f1419;
+  --card: #ffffff;
+  --card-foreground: #0f1419;
+  --popover: #ffffff;
+  --popover-foreground: #0f1419;
+  --primary: #4338ca;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #475569;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #e5e7eb;
+  --accent-foreground: #111827;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #d1d5db;
+  --input: #f9fafb;
+  --input-background: #ffffff;
+  --switch-background: #cbd5e1;
+  --ring: #4338ca;
+  
+  /* Kodex VCS Light (Minimal usage) */
+  --vcs-window-bg: #ffffff;
+  --vcs-sidebar-bg: #f8fafc;
+  --vcs-topbar-bg: #ffffff;
+  --vcs-border: #e5e7eb;
+  --vcs-hover: #f3f4f6;
+  --vcs-active: #e0e7ff;
+  --vcs-text-primary: #0f1419;
+  --vcs-text-secondary: #6b7280;
+  --vcs-text-muted: #9ca3af;
+  --vcs-blue: #4338ca;
+  --vcs-green: #059669;
+  --vcs-red: #dc2626;
+  --vcs-orange: #ea580c;
+  --vcs-gradient-start: #f8fafc;
+  --vcs-gradient-end: #f1f5f9;
+  
+  /* Kodex Norrsken (Aurora) Colors */
+  --kodex-bg: #0a0a0b;
+  --kodex-content: rgba(13, 13, 15, 0.85);
+  --kodex-sidebar: rgba(18, 18, 20, 0.95);
+  --kodex-topbar: rgba(15, 15, 17, 0.98);
+  --kodex-border: #1f1f23;
+  --kodex-hover: rgba(31, 31, 35, 0.8);
+  --kodex-active: rgba(67, 56, 202, 0.15);
+  --kodex-text-primary: #f1f5f9;
+  --kodex-text-secondary: #94a3b8;
+  --kodex-text-muted: #64748b;
+  --kodex-aurora-green: #34d399;
+  --kodex-aurora-blue: #60a5fa;
+  --kodex-aurora-purple: #a78bfa;
+  --kodex-aurora-pink: #f472b6;
+  
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --radius: 8px;
+}
+
+.dark {
+  /* Kodex Dark Theme (Primary) */
+  --background: var(--kodex-bg);
+  --foreground: var(--kodex-text-primary);
+  --card: rgba(18, 18, 20, 0.8);
+  --card-foreground: var(--kodex-text-primary);
+  --popover: rgba(24, 24, 27, 0.95);
+  --popover-foreground: var(--kodex-text-primary);
+  --primary: #4338ca;
+  --primary-foreground: #f8fafc;
+  --secondary: rgba(31, 31, 35, 0.6);
+  --secondary-foreground: var(--kodex-text-secondary);
+  --muted: rgba(24, 24, 27, 0.4);
+  --muted-foreground: var(--kodex-text-muted);
+  --accent: rgba(31, 31, 35, 0.8);
+  --accent-foreground: var(--kodex-text-primary);
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+  --border: var(--kodex-border);
+  --input: rgba(24, 24, 27, 0.6);
+  --ring: var(--kodex-aurora-blue);
+  
+  /* Kodex VCS Dark Colors */
+  --vcs-window-bg: var(--kodex-content);
+  --vcs-sidebar-bg: var(--kodex-sidebar);
+  --vcs-topbar-bg: var(--kodex-topbar);
+  --vcs-border: var(--kodex-border);
+  --vcs-hover: var(--kodex-hover);
+  --vcs-active: var(--kodex-active);
+  --vcs-text-primary: var(--kodex-text-primary);
+  --vcs-text-secondary: var(--kodex-text-secondary);
+  --vcs-text-muted: var(--kodex-text-muted);
+  --vcs-blue: var(--kodex-aurora-blue);
+  --vcs-green: var(--kodex-aurora-green);
+  --vcs-red: #ef4444;
+  --vcs-orange: #f97316;
+  --vcs-gradient-start: rgba(24, 24, 27, 0.4);
+  --vcs-gradient-end: rgba(31, 31, 35, 0.6);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-family);
+    overflow: hidden;
+  }
+  
+  .rune-font {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+}
+
+/**
+ * Base typography
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: 20px;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.4;
+    }
+
+    h4, p, button, input, label {
+      font-size: 14px;
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+    
+    button {
+      font-weight: var(--font-weight-medium);
+    }
+    
+    label {
+      font-weight: var(--font-weight-medium);
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* Minimal Kodex Styles */
+.kodex-aurora-bg {
+  background: radial-gradient(ellipse 60% 40% at 50% 0%, 
+    rgba(96, 165, 250, 0.02) 0%,
+    transparent 70%);
+}
+
+.kodex-bg {
+  background: var(--kodex-bg);
+}
+
+.kodex-content {
+  background: var(--kodex-content);
+  border-left: 1px solid var(--kodex-border);
+}
+
+.kodex-sidebar {
+  background: var(--kodex-sidebar);
+  backdrop-filter: blur(8px);
+}
+
+.kodex-topbar {
+  background: var(--kodex-topbar);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--kodex-border);
+}
+
+.kodex-glass {
+  background: rgba(24, 24, 27, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.kodex-glow {
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.kodex-aurora-text {
+  background: linear-gradient(135deg, 
+    var(--kodex-aurora-green) 0%,
+    var(--kodex-aurora-blue) 50%,
+    var(--kodex-aurora-purple) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Minimal Effects */
+.kodex-subtle {
+  background: rgba(24, 24, 27, 0.2);
+}
+
+/* Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}

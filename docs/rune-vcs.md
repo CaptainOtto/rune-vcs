@@ -345,15 +345,47 @@ rune-vcs push origin --delete feature/completed-feature
 
 ### Remote Management
 
-```bash
+````bash
 # Add remote
 rune-vcs remote add origin <url>
 
 # List remotes
 rune-vcs remote list
 
+
+---
+
+## 📝 Lightweight Planning (Experimental)
+
+Rune includes a minimal built-in planning system for tracking higher-level initiatives directly in your repository without external tooling. Plans are stored as simple Markdown files under `.rune/plans/` (not committed by default) so they remain lightweight and AI-friendly.
+
+### Create & Manage Plans
+
+```bash
+# Initialize planning directory
+rune-vcs plan init
+
+# Create a new plan (auto-incrementing ID like PLAN-001)
 # Remove remote
+
+# List plans
+rune-vcs plan list
+
+# Show a specific plan
+rune-vcs plan show PLAN-001
+
+# Update status (planned | active | in-progress | blocked | done)
 rune-vcs remote remove origin
+
+# Add a task to an existing plan
+rune-vcs plan add-task PLAN-001 "Document local dev setup script"
+````
+
+### Plan File Format
+
+Each plan is a Markdown file with a simple header and sections:
+
+```
 
 # Change remote URL
 rune-vcs remote set-url origin <new-url>
@@ -368,11 +400,17 @@ rune-vcs fetch origin
 # Pull changes (fetch + merge)
 rune-vcs pull origin main
 
-# Push changes
 rune-vcs push origin main
 
-# Push all branches
 rune-vcs push --all origin
+
+You can edit these files manually at any time. The CLI keeps `status` and `updated` consistent when you use commands.
+
+### Philosophy
+
+Keep planning frictionless, textual, and version-control adjacent. This feature is intentionally minimal today and may evolve into richer release intelligence later. Feedback welcome.
+
+---
 ```
 
 ---
@@ -730,6 +768,7 @@ rune-vcs repair
 **Alpha Release Notice**: This is an alpha version for testing and feedback. While functional, it's not recommended for production use.
 
 #### What's New in 0.3.0-alpha.4
+
 - ✅ Complete Homebrew integration with `johan-ott/rune-vcs` tap
 - ✅ Consistent binary naming (`rune-vcs` command)
 - ✅ Pre-built macOS binaries (ARM64 + x86_64)
@@ -739,6 +778,7 @@ rune-vcs repair
 - ✅ Comprehensive documentation updates
 
 #### Download Options
+
 - **Homebrew**: `brew install rune-vcs` (recommended)
 - **Direct Download**: GitHub releases with SHA256 verification
 - **From Source**: Cargo build with Rust toolchain
@@ -895,38 +935,38 @@ rune-vcs compare-with-git
 
 ### Git Compatibility
 
-| Git Command               | Rune VCS Equivalent           | Notes                          |
-| ------------------------- | ----------------------------- | ------------------------------ |
-| `git init`                | `rune-vcs init`               |                                |
-| `git add .`               | `rune-vcs add .`              |                                |
-| `git add -p`              | `rune-vcs add --patch`        | Interactive staging            |
-| `git commit -m "msg"`     | `rune-vcs commit -m "msg"`    |                                |
-| `git commit --amend`      | `rune-vcs commit --amend`     | Amend last commit              |
-| `git status`              | `rune-vcs status`             |                                |
-| `git log`                 | `rune-vcs log`                |                                |
-| `git show`                | `rune-vcs show`               | Show commit details            |
-| `git blame`               | `rune-vcs blame`              | Line-by-line file history      |
-| `git branch`              | `rune-vcs branch`             |                                |
-| `git checkout`            | `rune-vcs checkout`           |                                |
-| `git merge`               | `rune-vcs merge`              |                                |
-| `git revert`              | `rune-vcs revert`             | With --mainline support       |
-| `git reset`               | `rune-vcs reset`              | Soft/hard reset modes          |
-| `git rm`                  | `rune-vcs remove`             | Remove files                   |
-| `git mv`                  | `rune-vcs move`               | Move/rename files              |
-| `git stash`               | `rune-vcs stash`              |                                |
-| `git cherry-pick`         | `rune-vcs cherry-pick`        |                                |
-| `git rebase`              | `rune-vcs rebase`             |                                |
-| `git push`                | `rune-vcs push`               |                                |
-| `git pull`                | `rune-vcs pull`               |                                |
-| `git clone`               | `rune-vcs clone`              |                                |
-| `git fetch`               | `rune-vcs fetch`              |                                |
-| `git diff`                | `rune-vcs diff`               |                                |
-| `git submodule`           | `rune-vcs submodule`          |                                |
-| `git config`              | `rune-vcs config`             |                                |
-| _N/A_                     | `rune-vcs draft`              | 🆕 Draft commits & checkpoints |
-| _N/A_                     | `rune-vcs workspace`          | 🆕 Virtual workspaces          |
-| _N/A_                     | `rune-vcs intelligence`       | 🆕 AI-powered analysis         |
-| _N/A_                     | `rune-vcs doctor`             | 🆕 System diagnostics          |
+| Git Command           | Rune VCS Equivalent        | Notes                          |
+| --------------------- | -------------------------- | ------------------------------ |
+| `git init`            | `rune-vcs init`            |                                |
+| `git add .`           | `rune-vcs add .`           |                                |
+| `git add -p`          | `rune-vcs add --patch`     | Interactive staging            |
+| `git commit -m "msg"` | `rune-vcs commit -m "msg"` |                                |
+| `git commit --amend`  | `rune-vcs commit --amend`  | Amend last commit              |
+| `git status`          | `rune-vcs status`          |                                |
+| `git log`             | `rune-vcs log`             |                                |
+| `git show`            | `rune-vcs show`            | Show commit details            |
+| `git blame`           | `rune-vcs blame`           | Line-by-line file history      |
+| `git branch`          | `rune-vcs branch`          |                                |
+| `git checkout`        | `rune-vcs checkout`        |                                |
+| `git merge`           | `rune-vcs merge`           |                                |
+| `git revert`          | `rune-vcs revert`          | With --mainline support        |
+| `git reset`           | `rune-vcs reset`           | Soft/hard reset modes          |
+| `git rm`              | `rune-vcs remove`          | Remove files                   |
+| `git mv`              | `rune-vcs move`            | Move/rename files              |
+| `git stash`           | `rune-vcs stash`           |                                |
+| `git cherry-pick`     | `rune-vcs cherry-pick`     |                                |
+| `git rebase`          | `rune-vcs rebase`          |                                |
+| `git push`            | `rune-vcs push`            |                                |
+| `git pull`            | `rune-vcs pull`            |                                |
+| `git clone`           | `rune-vcs clone`           |                                |
+| `git fetch`           | `rune-vcs fetch`           |                                |
+| `git diff`            | `rune-vcs diff`            |                                |
+| `git submodule`       | `rune-vcs submodule`       |                                |
+| `git config`          | `rune-vcs config`          |                                |
+| _N/A_                 | `rune-vcs draft`           | 🆕 Draft commits & checkpoints |
+| _N/A_                 | `rune-vcs workspace`       | 🆕 Virtual workspaces          |
+| _N/A_                 | `rune-vcs intelligence`    | 🆕 AI-powered analysis         |
+| _N/A_                 | `rune-vcs doctor`          | 🆕 System diagnostics          |
 
 ---
 
@@ -1097,61 +1137,72 @@ rune-vcs profile
 The following capabilities are referenced in vision, docs, or design notes but are NOT yet implemented in the current release (v0.3.0-alpha.4). They are candidates for upcoming alpha milestones.
 
 ### 1. Performance Guardrails & Commit Constraints
+
 - Automatic enforcement of workspace performance limits (current: only manual workspace limits commands)
 - Commit size / changed-file thresholds with warnings or blocks
 - Time-to-index budget enforcement per operation
 - Predictive prefetch + adaptive caching heuristics toggles
 
 ### 2. Policy-as-Code
+
 - `rune-vcs policy` command group for listing, testing, and enforcing policies
 - Configurable repository rules (branch protections, required labels, file path restrictions)
 - Extensible policy engine (Rego / WASM based) for custom org rules
 - Built-in conventional commit validation (currently only achievable via hooks)
 
 ### 3. Structured Changelog Generation
+
 - `rune-vcs changelog generate` for Conventional Commit parsing
 - Release note templating & grouping (feat/fix/perf/chore/breaking)
 - Automatic linking to issues / PRs
 - Ability to diff changelog between two refs
 
 ### 4. Impact-Based Test Selection
+
 - `rune-vcs test` wrapper integrating dependency graph + file ↔ test mapping
 - Change impact analyzer suggesting minimal test set
 - Historical flake tracking & quarantine suggestions
 - Coverage delta reporting per draft / commit
 
 ### 5. Intelligent Change Graph Visualization
+
 - `rune-vcs graph` to render commit / draft / workspace dependency graph
 - Hotspot & risk surface overlays (AI-assisted)
 - Focus mode: collapse unrelated subgraphs
 - Export to JSON / SVG
 
 ### 6. Supply Chain & Dependency Diff Scanning
+
 - `rune-vcs deps scan` for third-party manifest inventory
 - Version drift detection & security advisory cross-referencing
 - SBOM generation (CycloneDX / SPDX)
 - Upgrade impact simulation report
 
 ### 7. Pluggable Storage Backend Abstraction
+
 - `rune-vcs storage` command for listing / switching backends
 - Local FS, object store (S3/GCS), and embedded KV modes
 - Content tiering (hot vs archival)
 - Encryption at rest per backend
 
 ### 8. Encrypted Path Subsets
+
 - `rune-vcs encrypt path/` to selectively encrypt directories
 - Secure key management (local KMS plugin architecture)
 - Policy requiring encryption for classified paths
 - Auditable access attempts & decryption events
 
 ### 9. Additional Enterprise Features (Exploratory)
+
 - SLA-aware replication scheduling
 - Multi-tenant namespace isolation
 - AI risk scoring for incoming patches
 - Merge queue with automated validation pipeline
 
 ### Status Legend Proposal
+
 (Will appear once features begin rolling out.)
+
 - ⏳ Planned
 - 🔨 In Progress
 - 🧪 Experimental (flagged)

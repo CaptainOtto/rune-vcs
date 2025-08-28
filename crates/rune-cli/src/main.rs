@@ -6,15 +6,15 @@ use rune_store::Store;
 pub mod commands;
 mod style;
 use anyhow::Context;
-use colored::*;
+use colored::{Color, ColoredString, Colorize};  // Import specific items to avoid Style conflict
 use rune_core::ignore::{IgnoreEngine, IgnoreRule, RuleType};
 use rune_docs::DocsEngine;
 use rune_performance::PerformanceEngine;
 use style::{init_colors, Style};
 pub mod intelligence;
 use chrono;
-use intelligence::{InsightSeverity, IntelligentFileAnalyzer};
-use std::{fs, io::Write, path::PathBuf};
+use intelligence::IntelligentFileAnalyzer;
+use std::{collections::HashSet, fs, io::Write, path::PathBuf};
 
 /// Global execution context carrying user preferences
 #[derive(Debug, Clone)]
@@ -400,6 +400,12 @@ enum Cmd {
     Log {
         #[arg(long, default_value = "table")]
         format: String,
+        #[arg(long, help = "Show ASCII art commit graph")]
+        graph: bool,
+        #[arg(long, help = "Show commits in one line")]
+        oneline: bool,
+        #[arg(short = 'n', long, help = "Limit number of commits to show")]
+        max_count: Option<usize>,
     },
     Branch {
         name: Option<String>,
@@ -424,6 +430,24 @@ enum Cmd {
     Diff {
         #[arg(help = "Compare specific commits (commit1..commit2) or working directory")]
         target: Option<String>,
+    },
+    /// Show repository file tree
+    Tree {
+        #[arg(help = "Directory to show (default: current directory)")]
+        path: Option<std::path::PathBuf>,
+        #[arg(short = 'a', long, help = "Show hidden files")]
+        all: bool,
+        #[arg(long, help = "Show only tracked files")]
+        tracked_only: bool,
+    },
+    /// List files in the repository
+    LsFiles {
+        #[arg(long, help = "Show only staged files")]
+        cached: bool,
+        #[arg(long, help = "Show only modified files")]
+        modified: bool,
+        #[arg(long, help = "Show file status")]
+        stage: bool,
     },
     /// Reset staging area or working directory
     Reset {
@@ -2079,10 +2103,15 @@ async fn main() -> anyhow::Result<()> {
                 ));
             }
         }
-        Cmd::Log { format } => {
+        Cmd::Log { format, graph, oneline, max_count } => {
             let s = Store::discover(std::env::current_dir()?)?;
-            let list = s.log();
+            let mut list = s.log();
             let fmt = format.as_str();
+
+            // Apply max_count limit if specified
+            if let Some(max) = max_count {
+                list = list.into_iter().take(max).collect();
+            }
 
             if fmt == "json" {
                 println!("{}", serde_json::to_string_pretty(&list)?);
@@ -2094,22 +2123,28 @@ async fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
 
-                for c in list.iter().rev() {
-                    let ts = chrono::DateTime::from_timestamp(c.time, 0)
-                        .unwrap()
-                        .naive_utc();
-                    let now = chrono::Utc::now().naive_utc();
-                    let ago = (now.and_utc().timestamp() - ts.and_utc().timestamp()) as i64;
+                if graph || oneline {
+                    // Enhanced visual output
+                    display_commit_graph(&list, graph, oneline)?;
+                } else {
+                    // Original detailed format
+                    for c in list.iter().rev() {
+                        let ts = chrono::DateTime::from_timestamp(c.time, 0)
+                            .unwrap()
+                            .naive_utc();
+                        let now = chrono::Utc::now().naive_utc();
+                        let ago = (now.and_utc().timestamp() - ts.and_utc().timestamp()) as i64;
 
-                    println!("commit {}", Style::commit_hash(&c.id));
-                    println!(
-                        "Date:    {} ({})",
-                        Style::timestamp(ts),
-                        style::format_duration(ago).dimmed()
-                    );
-                    println!();
-                    println!("    {}", c.message);
-                    println!();
+                        println!("commit {}", Style::commit_hash(&c.id));
+                        println!(
+                            "Date:    {} ({})",
+                            Style::timestamp(ts),
+                            style::format_duration(ago).dimmed()
+                        );
+                        println!();
+                        println!("    {}", c.message);
+                        println!();
+                    }
                 }
             }
         }
@@ -2400,7 +2435,7 @@ async fn main() -> anyhow::Result<()> {
             commands::draft::execute_draft_command(args)?;
         }
         Cmd::Plan { cmd } => {
-            use commands::plan::{PlanArgs, execute_plan_command};
+            use commands::plan::{execute_plan_command, PlanArgs};
             // Wrap single subcommand into PlanArgs for reuse pattern
             let args = PlanArgs { command: cmd };
             execute_plan_command(args)?;
@@ -2465,6 +2500,17 @@ async fn main() -> anyhow::Result<()> {
                     return Err(anyhow::anyhow!("Diff failed"));
                 }
             }
+        }
+
+        Cmd::Tree { path, all, tracked_only } => {
+            let s = Store::discover(std::env::current_dir()?)?;
+            let start_path = path.unwrap_or_else(|| std::env::current_dir().unwrap());
+            display_file_tree(&s, &start_path, all, tracked_only)?;
+        }
+
+        Cmd::LsFiles { cached, modified, stage } => {
+            let s = Store::discover(std::env::current_dir()?)?;
+            list_repository_files(&s, cached, modified, stage)?;
         }
 
         Cmd::Reset { files, hard } => {
@@ -3019,6 +3065,250 @@ fn blame_file(store: &Store, file_path: &PathBuf, line_range: Option<&str>) -> a
 
     if !file_commits.is_empty() {
         println!("File has {} commits in history", file_commits.len());
+    }
+
+    Ok(())
+}
+
+fn display_file_tree(store: &rune_store::Store, path: &std::path::Path, show_all: bool, tracked_only: bool) -> anyhow::Result<()> {
+    use colored::*;
+    use std::collections::HashSet;
+    
+    // Get staged/tracked files if needed
+    let tracked_files = if tracked_only {
+        let index = store.read_index()?;
+        Some(index.entries.keys().cloned().collect::<HashSet<String>>())
+    } else {
+        None
+    };
+
+    println!("{}", format!("📁 Repository Tree: {}", style::Style::file_path(&path.display().to_string())).cyan().bold());
+    println!();
+
+    display_tree_recursive(store, path, "", show_all, tracked_only, tracked_files.as_ref(), 0)?;
+    Ok(())
+}
+
+fn display_tree_recursive(
+    store: &rune_store::Store, 
+    dir: &std::path::Path, 
+    prefix: &str, 
+    show_all: bool, 
+    tracked_only: bool,
+    tracked_files: Option<&HashSet<String>>,
+    depth: usize
+) -> anyhow::Result<()> {
+    use colored::*;
+    
+    if depth > 10 { // Prevent infinite recursion
+        return Ok(());
+    }
+
+    let mut entries = std::fs::read_dir(dir)?
+        .filter_map(|entry| entry.ok())
+        .collect::<Vec<_>>();
+    
+    entries.sort_by_key(|entry| entry.file_name());
+
+    let repo_root = &store.root;
+    
+    for (i, entry) in entries.iter().enumerate() {
+        let file_name = entry.file_name();
+        let file_name_str = file_name.to_string_lossy();
+        
+        // Skip hidden files unless --all is specified
+        if !show_all && file_name_str.starts_with('.') {
+            continue;
+        }
+
+        // Skip .rune directory
+        if file_name_str == ".rune" {
+            continue;
+        }
+
+        let path = entry.path();
+        let is_last = i == entries.len() - 1;
+        let connector = if is_last { "└── " } else { "├── " };
+        
+        // Check if file is tracked
+        let relative_path = path.strip_prefix(repo_root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .to_string();
+            
+        let is_tracked = tracked_files.map_or(true, |files| files.contains(&relative_path));
+        
+        if tracked_only && !is_tracked {
+            continue;
+        }
+
+        let file_icon = if path.is_dir() {
+            "📁"
+        } else if is_tracked {
+            "📄"
+        } else {
+            "📄"
+        };
+
+        let file_display = if is_tracked {
+            format!("{} {}", file_icon, file_name_str.green())
+        } else {
+            format!("{} {}", file_icon, file_name_str.dimmed())
+        };
+
+        println!("{}{}{}", prefix, connector, file_display);
+
+        if path.is_dir() {
+            let new_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
+            display_tree_recursive(store, &path, &new_prefix, show_all, tracked_only, tracked_files, depth + 1)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn list_repository_files(store: &rune_store::Store, cached: bool, modified: bool, stage: bool) -> anyhow::Result<()> {
+    use colored::*;
+    
+    let index = store.read_index()?;
+    
+    if cached {
+        // Show only staged files
+        println!("{}", "📋 Staged Files:".cyan().bold());
+        for file in index.entries.keys() {
+            if stage {
+                println!("{} {}", "M".green(), style::Style::file_path(file));
+            } else {
+                println!("{}", style::Style::file_path(file));
+            }
+        }
+    } else if modified {
+        // Show modified files (this is simplified - in reality you'd compare working tree to HEAD)
+        println!("{}", "📝 Modified Files:".yellow().bold());
+        // For now, just show staged files as they represent modifications
+        for file in index.entries.keys() {
+            if stage {
+                println!("{} {}", "M".yellow(), style::Style::file_path(file));
+            } else {
+                println!("{}", style::Style::file_path(file));
+            }
+        }
+    } else {
+        // Show all tracked files
+        println!("{}", "📄 All Tracked Files:".cyan().bold());
+        
+        // Get all files that have ever been committed
+        let log = store.log();
+        let mut all_files = std::collections::HashSet::new();
+        
+        for commit in &log {
+            for file in &commit.files {
+                all_files.insert(file.clone());
+            }
+        }
+        
+        // Add currently staged files
+        for file in index.entries.keys() {
+            all_files.insert(file.clone());
+        }
+        
+        let mut files: Vec<_> = all_files.into_iter().collect();
+        files.sort();
+        
+        for file in files {
+            let status = if index.entries.contains_key(&file) {
+                "M" // Modified/staged
+            } else {
+                " " // Committed
+            };
+            
+            if stage {
+                println!("{} {}", status.green(), style::Style::file_path(&file));
+            } else {
+                println!("{}", style::Style::file_path(&file));
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+fn display_commit_graph(commits: &[rune_core::Commit], show_graph: bool, oneline: bool) -> anyhow::Result<()> {
+    use colored::*;
+    
+    if commits.is_empty() {
+        return Ok(());
+    }
+
+    // Build a simple parent-child relationship map
+    let mut children: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let commit_map: std::collections::HashMap<String, &rune_core::Commit> = 
+        commits.iter().map(|c| (c.id.clone(), c)).collect();
+
+    // Build children map (reverse of parent relationship)
+    for commit in commits {
+        if let Some(parent_id) = &commit.parent {
+            children.entry(parent_id.clone()).or_insert_with(Vec::new).push(commit.id.clone());
+        }
+    }
+
+    // Display commits in reverse chronological order (newest first)
+    for (i, commit) in commits.iter().rev().enumerate() {
+        let ts = chrono::DateTime::from_timestamp(commit.time, 0)
+            .unwrap()
+            .naive_utc();
+        let now = chrono::Utc::now().naive_utc();
+        let ago = (now.and_utc().timestamp() - ts.and_utc().timestamp()) as i64;
+
+        if show_graph {
+            // Simple ASCII graph representation
+            let graph_part = if i == 0 {
+                "* " // First commit (HEAD)
+            } else if commit.parent.is_some() {
+                "| " // Has parent
+            } else {
+                "o " // Root commit
+            };
+            
+            print!("{}", graph_part.yellow().bold());
+        }
+
+        if oneline {
+            // Compact one-line format
+            println!("{} {} {} ({})", 
+                style::Style::commit_hash(&commit.id[..8]),
+                truncate_string(&commit.message, 60),
+                commit.author.name.dimmed(),
+                style::format_duration(ago).dimmed()
+            );
+        } else {
+            // Multi-line format with graph
+            println!("commit {}", style::Style::commit_hash(&commit.id));
+            if let Some(parent) = &commit.parent {
+                println!("Parent:  {}", style::Style::commit_hash(parent));
+            }
+            println!("Author:  {}", commit.author.name);
+            println!(
+                "Date:    {} ({})",
+                style::Style::timestamp(ts),
+                style::format_duration(ago).dimmed()
+            );
+            println!();
+            println!("    {}", commit.message);
+            
+            if !commit.files.is_empty() {
+                println!();
+                println!("    Files changed:");
+                for file in &commit.files {
+                    if show_graph {
+                        println!("    |     + {}", style::Style::file_path(file));
+                    } else {
+                        println!("        + {}", style::Style::file_path(file));
+                    }
+                }
+            }
+            println!();
+        }
     }
 
     Ok(())

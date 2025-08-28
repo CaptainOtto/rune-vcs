@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - "v*.*.*"
-      - "v*.*.*-*"  # Support alpha/beta tags
+      - "v*.*.*-*" # Support alpha/beta tags
 
 permissions:
   contents: write
@@ -55,10 +55,10 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
           NAME="rune-${VERSION}-${{ matrix.target }}"
-          
+
           # Create the package
           mkdir -p dist
-          
+
           if [[ "${{ matrix.archive }}" == "tar.gz" ]]; then
             if [[ -f "target/${{ matrix.target }}/release/rune" ]]; then
               tar -czf dist/${NAME}.tar.gz -C target/${{ matrix.target }}/release rune

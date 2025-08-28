@@ -1,0 +1,136 @@
+version: "3.8"
+
+services:
+  # Primary Rune VCS server
+  rune-server-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rune-server-1
+    ports:
+      - "7421:7421"  # API server
+      - "7420:7420"  # Shrine server
+    volumes:
+      - rune-server-1-data:/workspace:rw
+      - rune-server-1-config:/home/rune/.config/rune:rw
+    working_dir: /workspace
+    command: rune-vcs api --with-shrine --addr 0.0.0.0:7421 --shrine-addr 0.0.0.0:7420
+    environment:
+      - RUST_LOG=debug
+      - RUNE_SERVER_ID=server-1
+      - RUNE_DEVELOPMENT=true
+    networks:
+      - rune-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7421/sync/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Secondary Rune VCS server for testing
+  rune-server-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rune-server-2
+    ports:
+      - "8421:7421"  # API server (different external port)
+      - "8420:7420"  # Shrine server (different external port)
+    volumes:
+      - rune-server-2-data:/workspace:rw
+      - rune-server-2-config:/home/rune/.config/rune:rw
+    working_dir: /workspace
+    command: rune-vcs api --with-shrine --addr 0.0.0.0:7421 --shrine-addr 0.0.0.0:7420
+    environment:
+      - RUST_LOG=debug
+      - RUNE_SERVER_ID=server-2
+      - RUNE_DEVELOPMENT=true
+    networks:
+      - rune-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7421/sync/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      rune-server-1:
+        condition: service_healthy
+
+  # Load balancer/reverse proxy
+  rune-nginx:
+    image: nginx:alpine
+    container_name: rune-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - rune-network
+    depends_on:
+      - rune-server-1
+      - rune-server-2
+
+  # Development container for testing
+  rune-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rune-dev
+    volumes:
+      - ./:/workspace:rw
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    working_dir: /workspace
+    command: /bin/bash
+    tty: true
+    stdin_open: true
+    environment:
+      - RUST_LOG=debug
+      - RUNE_DEVELOPMENT=true
+    networks:
+      - rune-network
+
+  # Monitoring and health checking
+  rune-monitor:
+    image: prom/prometheus:latest
+    container_name: rune-monitor
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - rune-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+networks:
+  rune-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  cargo-cache:
+    driver: local
+  target-cache:
+    driver: local
+  rune-server-1-data:
+    driver: local
+  rune-server-1-config:
+    driver: local
+  rune-server-2-data:
+    driver: local
+  rune-server-2-config:
+    driver: local
+  prometheus-data:
+    driver: local

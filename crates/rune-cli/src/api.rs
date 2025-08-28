@@ -1,9 +1,13 @@
 use anyhow::Result;
 use axum::{
+    extract::Path,
+    response::Html,
     routing::{get, post},
     Json, Router,
+    http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
+use tower_http::services::ServeDir;
 use std::net::SocketAddr;
 
 #[derive(Serialize, Deserialize)]
@@ -66,6 +70,15 @@ pub async fn serve_api(addr: SocketAddr) -> Result<()> {
         .route("/v1/branches", get(branches))
         .route("/v1/branch", post(branch_create))
         .route("/v1/checkout", post(checkout))
+        // visual/exploration
+        .route("/v1/tree", get(tree))
+        .route("/v1/files", get(files))
+        .route("/v1/show/:commit", get(show_commit))
+        // React app endpoints
+        .route("/v1/repository", get(repository_info))
+        .route("/v1/changes", get(changes))
+        .route("/v1/history", get(history))
+        .route("/v1/file-tree", get(file_tree))
         // lfs
         .route("/v1/lfs/track", post(lfs_track))
         .route("/v1/lfs/clean", post(lfs_clean))
@@ -75,7 +88,10 @@ pub async fn serve_api(addr: SocketAddr) -> Result<()> {
         // locks via shrine
         .route("/v1/locks", get(locks_list))
         .route("/v1/lock", post(lock))
-        .route("/v1/unlock", post(unlock));
+        .route("/v1/unlock", post(unlock))
+        // web ui - serve React app
+        .route("/", get(serve_index))
+        .nest_service("/assets", ServeDir::new("web/assets"));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app.into_make_service()).await?;
     Ok(())
@@ -296,6 +312,380 @@ async fn unlock(Json(req): Json<UnlockReq>) -> Json<serde_json::Value> {
         .await
         .unwrap();
     Json(serde_json::json!({"ok":true}))
+}
+
+// New visual/exploration endpoints
+async fn tree() -> Json<serde_json::Value> {
+    let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
+    let mut files = Vec::new();
+    
+    if let Ok(entries) = std::fs::read_dir(&s.root) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            
+            if name.starts_with('.') && name != ".gitignore" {
+                continue;
+            }
+            
+            files.push(serde_json::json!({
+                "name": name,
+                "path": path.strip_prefix(&s.root).unwrap_or(&path).to_string_lossy(),
+                "type": if path.is_dir() { "directory" } else { "file" },
+                "size": if path.is_file() { 
+                    std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) 
+                } else { 0 }
+            }));
+        }
+    }
+    
+    Json(serde_json::json!({
+        "files": files,
+        "root": s.root.to_string_lossy()
+    }))
+}
+
+async fn files() -> Json<serde_json::Value> {
+    let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
+    let index = s.read_index().unwrap();
+    let log = s.log();
+    
+    let mut all_files = std::collections::HashSet::new();
+    for commit in &log {
+        for file in &commit.files {
+            all_files.insert(file.clone());
+        }
+    }
+    
+    let files: Vec<_> = all_files.into_iter().map(|file| {
+        serde_json::json!({
+            "path": file,
+            "staged": index.entries.contains_key(&file),
+            "status": if index.entries.contains_key(&file) { "modified" } else { "committed" }
+        })
+    }).collect();
+    
+    Json(serde_json::json!({"files": files}))
+}
+
+async fn show_commit(Path(commit_id): Path<String>) -> Json<serde_json::Value> {
+    let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
+    let log = s.log();
+    
+    if let Some(commit) = log.iter().find(|c| c.id.starts_with(&commit_id)) {
+        Json(serde_json::json!({
+            "commit": commit,
+            "diff": s.diff(Some(&commit.id)).unwrap_or_else(|_| "Unable to generate diff".to_string())
+        }))
+    } else {
+        Json(serde_json::json!({
+            "error": "Commit not found"
+        }))
+    }
+}
+
+async fn serve_index() -> Result<Html<String>, StatusCode> {
+    match std::fs::read_to_string("web/index.html") {
+        Ok(content) => Ok(Html(content)),
+        Err(_) => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+async fn repository_info() -> Json<serde_json::Value> {
+    let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
+    Json(serde_json::json!({
+        "name": std::env::current_dir().unwrap().file_name().unwrap().to_string_lossy(),
+        "branch": s.head_ref(),
+        "url": "local",
+        "lastSync": serde_json::Value::Null
+    }))
+}
+
+async fn changes() -> Json<serde_json::Value> {
+    let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
+    let idx = s.read_index().unwrap();
+    
+    // Get staged files
+    let staged_files: Vec<serde_json::Value> = idx.entries.keys()
+        .map(|path| serde_json::json!({
+            "id": path,
+            "path": path,
+            "status": "modified",
+            "staged": true
+        }))
+        .collect();
+    
+    // Mock changelist for now
+    let changelists = vec![
+        serde_json::json!({
+            "id": "default",
+            "name": "Default Changelist",
+            "description": "Default changelist",
+            "files": staged_files
+        })
+    ];
+    
+    Json(serde_json::json!({
+        "changelists": changelists,
+        "unstagedFiles": []
+    }))
+}
+
+async fn history() -> Json<serde_json::Value> {
+    let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
+    let commits = s.log();
+    
+    let formatted_commits: Vec<serde_json::Value> = commits.into_iter()
+        .map(|commit| serde_json::json!({
+            "id": commit.id,
+            "message": commit.message,
+            "author": {
+                "name": commit.author.name,
+                "email": commit.author.email
+            },
+            "date": commit.time,
+            "branch": "main",
+            "parents": []
+        }))
+        .collect();
+    
+    Json(serde_json::json!({ "commits": formatted_commits }))
+}
+
+async fn file_tree() -> Json<serde_json::Value> {
+    use std::fs;
+    use std::path::Path;
+    
+    fn build_tree_recursive(path: &Path, name: String) -> serde_json::Value {
+        if path.is_dir() {
+            let mut children = Vec::new();
+            if let Ok(entries) = fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    let entry_name = entry.file_name().to_string_lossy().to_string();
+                    if !entry_name.starts_with('.') && entry_name != "target" {
+                        children.push(build_tree_recursive(&entry.path(), entry_name));
+                    }
+                }
+            }
+            serde_json::json!({
+                "id": path.to_string_lossy(),
+                "name": name,
+                "type": "folder",
+                "children": children,
+                "status": serde_json::Value::Null
+            })
+        } else {
+            serde_json::json!({
+                "id": path.to_string_lossy(),
+                "name": name,
+                "type": "file",
+                "children": serde_json::Value::Null,
+                "status": serde_json::Value::Null
+            })
+        }
+    }
+    
+    let current_dir = std::env::current_dir().unwrap();
+    let tree = build_tree_recursive(&current_dir, "root".to_string());
+    
+    Json(tree)
+}
+
+async fn web_ui() -> Html<String> {
+    Html(r#"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rune VCS Repository</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a1a; color: #e0e0e0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: #2d2d2d; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .header h1 { color: #4fc3f7; margin-bottom: 10px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; background: #3d3d3d; border: none; color: #e0e0e0; cursor: pointer; border-radius: 4px; }
+        .tab.active { background: #4fc3f7; color: #1a1a1a; }
+        .content { background: #2d2d2d; padding: 20px; border-radius: 8px; min-height: 400px; }
+        .commit { border-bottom: 1px solid #4d4d4d; padding: 15px 0; }
+        .commit:last-child { border-bottom: none; }
+        .commit-hash { color: #ffb74d; font-family: monospace; }
+        .commit-message { color: #e0e0e0; margin: 5px 0; }
+        .commit-meta { color: #9e9e9e; font-size: 0.9em; }
+        .file-item { padding: 8px; margin: 2px 0; background: #3d3d3d; border-radius: 4px; }
+        .file-name { color: #81c784; }
+        .file-path { color: #9e9e9e; font-size: 0.9em; }
+        .loading { text-align: center; padding: 40px; color: #9e9e9e; }
+        .status-info { display: flex; gap: 20px; margin-bottom: 15px; }
+        .status-item { background: #3d3d3d; padding: 10px; border-radius: 4px; flex: 1; }
+        .status-value { color: #4fc3f7; font-size: 1.2em; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🪄 Rune VCS Repository</h1>
+            <div id="status-info" class="status-info">
+                <div class="status-item">
+                    <div>Current Branch</div>
+                    <div id="current-branch" class="status-value">-</div>
+                </div>
+                <div class="status-item">
+                    <div>Staged Files</div>
+                    <div id="staged-count" class="status-value">-</div>
+                </div>
+                <div class="status-item">
+                    <div>Total Files</div>
+                    <div id="total-files" class="status-value">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('commits')">📋 Commits</button>
+            <button class="tab" onclick="showTab('files')">📄 Files</button>
+            <button class="tab" onclick="showTab('tree')">📁 Tree</button>
+        </div>
+        
+        <div class="content">
+            <div id="commits-content">
+                <div class="loading">Loading commits...</div>
+            </div>
+            <div id="files-content" style="display: none;">
+                <div class="loading">Loading files...</div>
+            </div>
+            <div id="tree-content" style="display: none;">
+                <div class="loading">Loading file tree...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'commits';
+        
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[onclick="showTab('${tab}')"]`).classList.add('active');
+            
+            document.querySelectorAll('[id$="-content"]').forEach(c => c.style.display = 'none');
+            document.getElementById(`${tab}-content`).style.display = 'block';
+            
+            currentTab = tab;
+            loadData();
+        }
+        
+        async function loadStatus() {
+            try {
+                const response = await fetch('/v1/status');
+                const data = await response.json();
+                
+                document.getElementById('current-branch').textContent = data.branch || 'main';
+                document.getElementById('staged-count').textContent = data.staged ? data.staged.length : 0;
+            } catch (e) {
+                console.error('Failed to load status:', e);
+            }
+        }
+        
+        async function loadCommits() {
+            try {
+                const response = await fetch('/v1/log');
+                const commits = await response.json();
+                
+                const content = document.getElementById('commits-content');
+                if (commits.length === 0) {
+                    content.innerHTML = '<div class="loading">No commits yet</div>';
+                    return;
+                }
+                
+                content.innerHTML = commits.slice().reverse().map(commit => `
+                    <div class="commit">
+                        <div class="commit-hash">${commit.id.substring(0, 8)}</div>
+                        <div class="commit-message">${commit.message}</div>
+                        <div class="commit-meta">
+                            ${commit.author.name} • ${new Date(commit.time * 1000).toLocaleDateString()}
+                            ${commit.files.length ? ` • ${commit.files.length} files` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                document.getElementById('commits-content').innerHTML = 
+                    '<div class="loading">Failed to load commits</div>';
+            }
+        }
+        
+        async function loadFiles() {
+            try {
+                const response = await fetch('/v1/files');
+                const data = await response.json();
+                
+                document.getElementById('total-files').textContent = data.files.length;
+                
+                const content = document.getElementById('files-content');
+                if (data.files.length === 0) {
+                    content.innerHTML = '<div class="loading">No tracked files</div>';
+                    return;
+                }
+                
+                content.innerHTML = data.files.map(file => `
+                    <div class="file-item">
+                        <div class="file-name">📄 ${file.path}</div>
+                        <div class="file-path">Status: ${file.status}${file.staged ? ' (staged)' : ''}</div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                document.getElementById('files-content').innerHTML = 
+                    '<div class="loading">Failed to load files</div>';
+            }
+        }
+        
+        async function loadTree() {
+            try {
+                const response = await fetch('/v1/tree');
+                const data = await response.json();
+                
+                const content = document.getElementById('tree-content');
+                if (data.files.length === 0) {
+                    content.innerHTML = '<div class="loading">No files found</div>';
+                    return;
+                }
+                
+                content.innerHTML = data.files.map(file => `
+                    <div class="file-item">
+                        <div class="file-name">${file.type === 'directory' ? '📁' : '📄'} ${file.name}</div>
+                        <div class="file-path">
+                            ${file.path}${file.type === 'file' ? ` • ${file.size} bytes` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                document.getElementById('tree-content').innerHTML = 
+                    '<div class="loading">Failed to load file tree</div>';
+            }
+        }
+        
+        function loadData() {
+            switch (currentTab) {
+                case 'commits': loadCommits(); break;
+                case 'files': loadFiles(); break;
+                case 'tree': loadTree(); break;
+            }
+        }
+        
+        // Load initial data
+        loadStatus();
+        loadData();
+        
+        // Refresh every 30 seconds
+        setInterval(() => {
+            loadStatus();
+            loadData();
+        }, 30000);
+    </script>
+</body>
+</html>
+    "#.to_string())
 }
 
 pub async fn run_api(addr: String) -> Result<()> {

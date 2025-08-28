@@ -4,9 +4,14 @@ use axum::{
     Json, Router,
 };
 use tokio::net::TcpListener;
-// ...existing code...
 use serde::{Deserialize, Serialize};
 use std::{fs, net::SocketAddr, path::PathBuf};
+
+pub mod auth;
+pub mod sync;
+
+pub use auth::{AuthService, Permission};
+pub use sync::{Commit, Branch, FileChange, FileOperation};
 
 #[derive(Clone)]
 pub struct Shrine {
@@ -36,12 +41,21 @@ pub struct LockReq {
 
 pub async fn run_server(shrine: Shrine, addr: SocketAddr) -> Result<()> {
     let app = Router::new()
+        // LFS endpoints
         .route("/lfs/upload", post(lfs_upload))
         .route("/lfs/download", post(lfs_download))
         .route("/lfs/has", post(lfs_has))
+        // Lock endpoints
         .route("/locks/list", get(locks_list))
         .route("/locks/lock", post(lock))
         .route("/locks/unlock", post(unlock))
+        // Repository sync endpoints
+        .route("/sync/info", get(sync::get_repository_info))
+        .route("/sync/push", post(sync::push_commits))
+        .route("/sync/pull", post(sync::pull_commits))
+        .route("/sync/branches", get(sync::get_branches_endpoint))
+        .route("/sync/commits/:since", get(sync::get_commits_since))
+        .route("/sync/repository/:remote", post(sync::sync_repository))
         .with_state(shrine);
     let listener = TcpListener::bind(addr).await?;
     axum::serve::serve(listener, app.into_make_service()).await?;

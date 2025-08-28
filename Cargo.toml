@@ -12,6 +12,7 @@ members = [
     "crates/rune-docs",
     "crates/rune-workspace",
     "crates/rune-draft",
+    "crates/rune-planning",
 ]
 
 [workspace.package]
@@ -42,6 +43,7 @@ clap_complete = "4"
 reqwest = { version = "0.12", features = ["json","gzip","rustls-tls"] }
 tokio = { version = "1", features = ["full"] }
 axum = "0.7"
+tower-http = { version = "0.5", features = ["fs"] }
 blake3 = "1"
 glob = "0.3"
 zstd = "0.13"
