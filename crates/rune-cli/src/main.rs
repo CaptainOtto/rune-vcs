@@ -2053,17 +2053,13 @@ async fn main() -> anyhow::Result<()> {
                 let mut added_count = 0;
 
                 // Initialize performance optimizations
-                engine.optimize_memory()?;
-                engine.predictive_cache(".")?;
+                engine.clear_cache();
 
                 // Enable parallel processing for multiple files
                 let file_paths: Vec<String> = paths
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())
                     .collect();
-                if file_paths.len() > 1 {
-                    engine.parallel_add(&file_paths)?;
-                }
 
                 for p in paths {
                     let rel = p.to_string_lossy().to_string();
@@ -2071,11 +2067,12 @@ async fn main() -> anyhow::Result<()> {
                     // Revolutionary intelligence: Analyze file before adding
                     let _ = analyzer.analyze_file(&rel);
 
-                    // Revolutionary performance: Optimize storage
-                    let _ = engine.optimize_storage(&rel);
-                    let _ = engine.smart_delta(&rel);
+                    // Use performance benchmarking for file operations
+                    let stage_result = engine.benchmark("stage_file", || {
+                        s.stage_file(&rel)
+                    });
 
-                    match s.stage_file(&rel) {
+                    match stage_result {
                         Ok(_) => {
                             added_count += 1;
                             if added_count <= 10 {
@@ -2102,7 +2099,7 @@ async fn main() -> anyhow::Result<()> {
                     ));
 
                     // Show performance statistics
-                    engine.show_stats();
+                    engine.print_performance_summary();
                 }
             }
         }
