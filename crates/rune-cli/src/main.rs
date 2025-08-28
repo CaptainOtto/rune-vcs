@@ -9,12 +9,13 @@ use anyhow::Context;
 use colored::{Color, ColoredString, Colorize};  // Import specific items to avoid Style conflict
 use rune_core::ignore::{IgnoreEngine, IgnoreRule, RuleType};
 use rune_docs::DocsEngine;
-use rune_performance::PerformanceEngine;
+use rune_performance::{PerformanceEngine, AdvancedPerformanceEngine, PerformanceConfig};
 use style::{init_colors, Style};
 pub mod intelligence;
 use chrono;
 use intelligence::IntelligentFileAnalyzer;
 use std::{collections::HashSet, fs, io::Write, path::PathBuf};
+use num_cpus;
 
 /// Global execution context carrying user preferences
 #[derive(Debug, Clone)]
@@ -2052,43 +2053,93 @@ async fn main() -> anyhow::Result<()> {
                 let engine = PerformanceEngine::new();
                 let mut added_count = 0;
 
-                // Initialize performance optimizations
-                engine.clear_cache();
-
-                // Enable parallel processing for multiple files
-                let file_paths: Vec<String> = paths
-                    .iter()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .collect();
-
-                for p in paths {
-                    let rel = p.to_string_lossy().to_string();
-
-                    // Revolutionary intelligence: Analyze file before adding
-                    let _ = analyzer.analyze_file(&rel);
-
-                    // Use performance benchmarking for file operations
-                    let stage_result = engine.benchmark("stage_file", || {
-                        s.stage_file(&rel)
+                // For multiple files, use advanced parallel processing (without async runtime)
+                if paths.len() > 5 {
+                    Style::info("🚀 Detected multiple files, enabling advanced parallel processing...");
+                    
+                    let advanced_engine = AdvancedPerformanceEngine::with_config(PerformanceConfig {
+                        max_parallel_operations: num_cpus::get().min(8),
+                        cache_size_mb: 128,
+                        enable_memory_mapping: true,
+                        enable_parallel_diff: true,
+                        enable_async_io: false, // Disable async for CLI context
+                        bandwidth_limit_mbps: None,
                     });
 
-                    match stage_result {
-                        Ok(_) => {
-                            added_count += 1;
+                    // Process files in parallel using rayon (sync parallel processing)
+                    let file_paths: Vec<PathBuf> = paths.clone();
+                    
+                    use rayon::prelude::*;
+                    let results: Result<Vec<_>, _> = file_paths
+                        .par_iter()
+                        .map(|file_path| {
+                            let rel = file_path.to_string_lossy().to_string();
+                            
+                            // Create local store and analyzer for this thread
+                            let local_store = Store::discover(std::env::current_dir()?)?;
+                            let mut local_analyzer = IntelligentFileAnalyzer::new();
+                            
+                            // Intelligence analysis
+                            let _ = local_analyzer.analyze_file(&rel);
+                            
+                            // Stage the file
+                            local_store.stage_file(&rel)
+                        })
+                        .collect();
+                    
+                    match results {
+                        Ok(stage_results) => {
+                            added_count = stage_results.len();
+                            
+                            // Show summary for many files
                             if added_count <= 10 {
-                                // Only show first 10 files to avoid spam
-                                println!("add {}", Style::file_path(&rel));
+                                for path in &paths {
+                                    println!("add {}", Style::file_path(&path.to_string_lossy()));
+                                }
+                            } else {
+                                println!("add {} files (showing first 10):", added_count);
+                                for path in paths.iter().take(10) {
+                                    println!("add {}", Style::file_path(&path.to_string_lossy()));
+                                }
+                                println!("... and {} more files", added_count - 10);
                             }
+                            
+                            advanced_engine.print_performance_summary();
                         }
                         Err(e) => {
-                            Style::error(&format!("Failed to add {}: {}", rel, e));
-                            return Err(anyhow::anyhow!("Failed to add {}: {}", rel, e));
+                            Style::error(&format!("Parallel processing failed: {}", e));
+                            return Err(e);
                         }
                     }
-                }
+                } else {
+                    // Use simple engine for few files
+                    engine.clear_cache();
 
-                if added_count > 10 {
-                    println!("... and {} more files", added_count - 10);
+                    for p in paths {
+                        let rel = p.to_string_lossy().to_string();
+
+                        // Revolutionary intelligence: Analyze file before adding
+                        let _ = analyzer.analyze_file(&rel);
+
+                        // Use performance benchmarking for file operations
+                        let stage_result = engine.benchmark("stage_file", || {
+                            s.stage_file(&rel)
+                        });
+
+                        match stage_result {
+                            Ok(_) => {
+                                added_count += 1;
+                                println!("add {}", Style::file_path(&rel));
+                            }
+                            Err(e) => {
+                                Style::error(&format!("Failed to add {}: {}", rel, e));
+                                return Err(anyhow::anyhow!("Failed to add {}: {}", rel, e));
+                            }
+                        }
+                    }
+
+                    // Show performance statistics for simple engine
+                    engine.print_performance_summary();
                 }
 
                 if added_count > 0 {
