@@ -9,9 +9,11 @@ use std::{fs, net::SocketAddr, path::PathBuf};
 
 pub mod auth;
 pub mod sync;
+pub mod client;
 
 pub use auth::{AuthService, Permission};
 pub use sync::{Commit, Branch, FileChange, FileOperation};
+pub use client::{RemoteManager, RemoteConfig, RemoteCommands};
 
 #[derive(Clone)]
 pub struct Shrine {

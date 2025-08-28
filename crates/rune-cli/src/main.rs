@@ -380,6 +380,21 @@ enum Cmd {
     },
     Guide,
     Init,
+    /// Clone a repository from a remote source
+    Clone {
+        /// Repository URL to clone
+        url: String,
+        /// Local directory name (optional)
+        directory: Option<String>,
+        /// Authentication token
+        #[arg(short, long)]
+        token: Option<String>,
+    },
+    /// Manage remote repositories  
+    Remote {
+        #[command(subcommand)]
+        command: crate::commands::remote::RemoteCommand,
+    },
     Status {
         #[arg(long, default_value = "table")]
         format: String,
@@ -494,13 +509,6 @@ enum Cmd {
         file: PathBuf,
         #[arg(long, help = "Line range to show (e.g., 1:10)")]
         line_range: Option<String>,
-    },
-    /// Clone a remote repository
-    Clone {
-        #[arg(help = "Repository URL to clone")]
-        url: String,
-        #[arg(help = "Directory to clone into")]
-        directory: Option<std::path::PathBuf>,
     },
     /// Fetch changes from remote repository
     Fetch {
@@ -1958,6 +1966,24 @@ async fn main() -> anyhow::Result<()> {
                 ));
             }
         }
+        Cmd::Clone { url, directory, token } => {
+            let args = crate::commands::clone::CloneArgs {
+                url: url.clone(),
+                directory: directory.clone(),
+                token: token.clone(),
+                recursive: false,
+                bare: false,
+                branch: None,
+                depth: None,
+            };
+            crate::commands::clone::handle_clone_command(args).await?;
+        }
+        Cmd::Remote { command } => {
+            let args = crate::commands::remote::RemoteArgs {
+                command: command.clone(),
+            };
+            crate::commands::remote::handle_remote_command(args).await?;
+        }
         Cmd::Status { format } => {
             let s = Store::discover(std::env::current_dir()?)?;
             let idx = s.read_index()?;
@@ -2731,10 +2757,6 @@ async fn main() -> anyhow::Result<()> {
 
         Cmd::Version => {
             print_version_info();
-        }
-
-        Cmd::Clone { url, directory } => {
-            clone_repository(&url, directory.as_ref(), &ctx).await?;
         }
 
         Cmd::Fetch { remote } => {

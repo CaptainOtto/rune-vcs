@@ -8,6 +8,9 @@ Cargo.lock
 # Test files and temp directories
 /test_files/
 /temp/
+/temp-project-ref/
+/test_clone/
+/test-files/
 *.tmp
 *.temp
 test_*.rs
@@ -24,7 +27,8 @@ hello.cpp
 
 # Environment and secrets
 .env
-.env.*
+.env.local
+.env.production
 **/secret*
 **/key*
 **/*password*

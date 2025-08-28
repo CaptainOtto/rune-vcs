@@ -1,8 +1,10 @@
 pub mod advanced;
+pub mod clone;
 pub mod delta;
 pub mod draft;
 pub mod intelligence;
 pub mod lfs;
 pub mod plan;
+pub mod remote;
 pub mod shrine;
 pub mod workspace;
