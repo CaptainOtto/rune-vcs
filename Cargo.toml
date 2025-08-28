@@ -13,6 +13,8 @@ members = [
     "crates/rune-workspace",
     "crates/rune-draft",
     "crates/rune-planning",
+    "crates/rune-security",
+    "crates/rune-ai",
 ]
 
 [workspace.package]

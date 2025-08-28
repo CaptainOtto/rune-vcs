@@ -1,0 +1,31 @@
+[package]
+name = "rune-security"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Advanced security features for Rune VCS"
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+uuid = { version = "1.0", features = ["v4"] }
+bcrypt = "0.15"
+ring = "0.17"
+aes-gcm = "0.10"
+rsa = "0.9"
+x509-parser = "0.16"
+base64 = "0.22"
+base32 = "0.4"
+hex = "0.4"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+totp-rs = "5.0"
+qrcode = "0.14"
+webauthn-rs = "0.4"
+jsonwebtoken = "9.0"
+rune-core = { path = "../rune-core" }
+
+[dev-dependencies]
+tempfile = "3.8"
