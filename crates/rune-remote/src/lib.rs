@@ -3,17 +3,17 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use tokio::net::TcpListener;
 use serde::{Deserialize, Serialize};
 use std::{fs, net::SocketAddr, path::PathBuf};
+use tokio::net::TcpListener;
 
 pub mod auth;
-pub mod sync;
 pub mod client;
+pub mod sync;
 
 pub use auth::{AuthService, Permission};
-pub use sync::{Commit, Branch, FileChange, FileOperation};
-pub use client::{RemoteManager, RemoteConfig, RemoteCommands};
+pub use client::{RemoteCommands, RemoteConfig, RemoteManager};
+pub use sync::{Branch, Commit, FileChange, FileOperation};
 
 #[derive(Clone)]
 pub struct Shrine {

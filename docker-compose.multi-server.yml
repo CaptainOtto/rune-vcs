@@ -8,8 +8,8 @@ services:
       dockerfile: Dockerfile
     container_name: rune-server-1
     ports:
-      - "7421:7421"  # API server
-      - "7420:7420"  # Shrine server
+      - "7421:7421" # API server
+      - "7420:7420" # Shrine server
     volumes:
       - rune-server-1-data:/workspace:rw
       - rune-server-1-config:/home/rune/.config/rune:rw
@@ -35,8 +35,8 @@ services:
       dockerfile: Dockerfile
     container_name: rune-server-2
     ports:
-      - "8421:7421"  # API server (different external port)
-      - "8420:7420"  # Shrine server (different external port)
+      - "8421:7421" # API server (different external port)
+      - "8420:7420" # Shrine server (different external port)
     volumes:
       - rune-server-2-data:/workspace:rw
       - rune-server-2-config:/home/rune/.config/rune:rw
@@ -106,11 +106,11 @@ services:
     networks:
       - rune-network
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
 
 networks:
   rune-network:

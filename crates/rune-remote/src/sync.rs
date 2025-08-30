@@ -1,8 +1,11 @@
+use crate::Shrine;
 use anyhow::Result;
-use axum::{extract::{State, Path}, Json};
+use axum::{
+    extract::{Path, State},
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
-use crate::Shrine;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Commit {
@@ -66,11 +69,11 @@ pub struct RepositoryInfo {
 }
 
 // Repository sync endpoints
-pub async fn get_repository_info(
-    State(shrine): State<Shrine>,
-) -> Json<RepositoryInfo> {
+pub async fn get_repository_info(State(shrine): State<Shrine>) -> Json<RepositoryInfo> {
     let repo_info = RepositoryInfo {
-        name: shrine.root.file_name()
+        name: shrine
+            .root
+            .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string(),
@@ -78,7 +81,7 @@ pub async fn get_repository_info(
         head_commit: get_head_commit(&shrine.root),
         remote_url: get_remote_url(&shrine.root),
     };
-    
+
     Json(repo_info)
 }
 
@@ -87,7 +90,7 @@ pub async fn push_commits(
     Json(request): Json<PushRequest>,
 ) -> Json<SyncResponse> {
     let result = handle_push_commits(&shrine, request).await;
-    
+
     match result {
         Ok(response) => Json(response),
         Err(e) => Json(SyncResponse {
@@ -104,7 +107,7 @@ pub async fn pull_commits(
     Json(request): Json<PullRequest>,
 ) -> Json<SyncResponse> {
     let result = handle_pull_commits(&shrine, request).await;
-    
+
     match result {
         Ok(response) => Json(response),
         Err(e) => Json(SyncResponse {
@@ -121,7 +124,7 @@ pub async fn sync_repository(
     Path(remote_server): Path<String>,
 ) -> Json<SyncResponse> {
     let result = handle_repository_sync(&shrine, &remote_server).await;
-    
+
     match result {
         Ok(response) => Json(response),
         Err(e) => Json(SyncResponse {
@@ -133,9 +136,7 @@ pub async fn sync_repository(
     }
 }
 
-pub async fn get_branches_endpoint(
-    State(shrine): State<Shrine>,
-) -> Json<Vec<Branch>> {
+pub async fn get_branches_endpoint(State(shrine): State<Shrine>) -> Json<Vec<Branch>> {
     let branches = get_branches(&shrine.root).unwrap_or_default();
     Json(branches)
 }
@@ -152,10 +153,10 @@ pub async fn get_commits_since(
 async fn handle_push_commits(shrine: &Shrine, request: PushRequest) -> Result<SyncResponse> {
     let commits_dir = shrine.root.join(".rune/commits");
     fs::create_dir_all(&commits_dir)?;
-    
+
     let mut conflicts = Vec::new();
     let mut processed = 0;
-    
+
     for commit in &request.commits {
         // Check for conflicts
         let commit_path = commits_dir.join(&commit.hash);
@@ -163,24 +164,32 @@ async fn handle_push_commits(shrine: &Shrine, request: PushRequest) -> Result<Sy
             conflicts.push(format!("Commit {} already exists", commit.hash));
             continue;
         }
-        
+
         // Store commit
         let commit_json = serde_json::to_string_pretty(commit)?;
         fs::write(commit_path, commit_json)?;
         processed += 1;
     }
-    
+
     // Update branch head if no conflicts
     if conflicts.is_empty() && !request.commits.is_empty() {
-        update_branch_head(&shrine.root, &request.branch, &request.commits.last().unwrap().hash)?;
+        update_branch_head(
+            &shrine.root,
+            &request.branch,
+            &request.commits.last().unwrap().hash,
+        )?;
     }
-    
+
     Ok(SyncResponse {
         success: conflicts.is_empty(),
         message: if conflicts.is_empty() {
             format!("Successfully pushed {} commits", processed)
         } else {
-            format!("Pushed {} commits with {} conflicts", processed, conflicts.len())
+            format!(
+                "Pushed {} commits with {} conflicts",
+                processed,
+                conflicts.len()
+            )
         },
         commits_processed: processed,
         conflicts,
@@ -193,10 +202,14 @@ async fn handle_pull_commits(shrine: &Shrine, request: PullRequest) -> Result<Sy
     } else {
         get_all_commits(&shrine.root)?
     };
-    
+
     Ok(SyncResponse {
         success: true,
-        message: format!("Found {} commits for branch {}", commits.len(), request.branch),
+        message: format!(
+            "Found {} commits for branch {}",
+            commits.len(),
+            request.branch
+        ),
         commits_processed: commits.len(),
         conflicts: vec![],
     })
@@ -205,16 +218,16 @@ async fn handle_pull_commits(shrine: &Shrine, request: PullRequest) -> Result<Sy
 async fn handle_repository_sync(_shrine: &Shrine, remote_server: &str) -> Result<SyncResponse> {
     // This would implement full repository synchronization with another server
     // For now, we'll implement a basic version
-    
+
     println!("🔄 Syncing repository with server: {}", remote_server);
-    
+
     // In a real implementation, this would:
     // 1. Connect to remote server
     // 2. Compare commit histories
     // 3. Exchange missing commits
     // 4. Resolve conflicts
     // 5. Update branch references
-    
+
     Ok(SyncResponse {
         success: true,
         message: format!("Repository sync with {} completed", remote_server),
@@ -226,19 +239,17 @@ async fn handle_repository_sync(_shrine: &Shrine, remote_server: &str) -> Result
 fn get_branches(repo_root: &PathBuf) -> Result<Vec<Branch>> {
     let branches_dir = repo_root.join(".rune/refs/heads");
     let mut branches = Vec::new();
-    
+
     if !branches_dir.exists() {
         return Ok(branches);
     }
-    
+
     for entry in fs::read_dir(branches_dir)? {
         let entry = entry?;
         if entry.file_type()?.is_file() {
             let branch_name = entry.file_name().to_string_lossy().to_string();
-            let head_commit = fs::read_to_string(entry.path())?
-                .trim()
-                .to_string();
-            
+            let head_commit = fs::read_to_string(entry.path())?.trim().to_string();
+
             branches.push(Branch {
                 name: branch_name,
                 head_commit,
@@ -246,13 +257,17 @@ fn get_branches(repo_root: &PathBuf) -> Result<Vec<Branch>> {
             });
         }
     }
-    
+
     Ok(branches)
 }
 
 fn get_head_commit(repo_root: &PathBuf) -> Option<String> {
     let head_file = repo_root.join(".rune/HEAD");
-    fs::read_to_string(head_file).ok()?.trim().to_string().into()
+    fs::read_to_string(head_file)
+        .ok()?
+        .trim()
+        .to_string()
+        .into()
 }
 
 fn get_remote_url(repo_root: &PathBuf) -> Option<String> {
@@ -271,39 +286,39 @@ fn get_remote_url(repo_root: &PathBuf) -> Option<String> {
 fn get_commits_since_hash(repo_root: &PathBuf, since_hash: &str) -> Result<Vec<Commit>> {
     let commits_dir = repo_root.join(".rune/commits");
     let mut commits = Vec::new();
-    
+
     if !commits_dir.exists() {
         return Ok(commits);
     }
-    
+
     for entry in fs::read_dir(commits_dir)? {
         let entry = entry?;
         if entry.file_type()?.is_file() {
             let commit_hash = entry.file_name().to_string_lossy().to_string();
-            
+
             // Skip commits before the "since" commit
             if commit_hash == since_hash {
                 break;
             }
-            
+
             let commit_content = fs::read_to_string(entry.path())?;
             if let Ok(commit) = serde_json::from_str::<Commit>(&commit_content) {
                 commits.push(commit);
             }
         }
     }
-    
+
     Ok(commits)
 }
 
 fn get_all_commits(repo_root: &PathBuf) -> Result<Vec<Commit>> {
     let commits_dir = repo_root.join(".rune/commits");
     let mut commits = Vec::new();
-    
+
     if !commits_dir.exists() {
         return Ok(commits);
     }
-    
+
     for entry in fs::read_dir(commits_dir)? {
         let entry = entry?;
         if entry.file_type()?.is_file() {
@@ -313,10 +328,10 @@ fn get_all_commits(repo_root: &PathBuf) -> Result<Vec<Commit>> {
             }
         }
     }
-    
+
     // Sort by timestamp (newest first)
     commits.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-    
+
     Ok(commits)
 }
 
@@ -324,7 +339,7 @@ fn update_branch_head(repo_root: &PathBuf, branch: &str, commit_hash: &str) -> R
     let branch_file = repo_root.join(".rune/refs/heads").join(branch);
     fs::create_dir_all(branch_file.parent().unwrap())?;
     fs::write(branch_file, commit_hash)?;
-    
+
     // Update HEAD if this is the current branch
     let head_file = repo_root.join(".rune/HEAD");
     if let Ok(current_branch) = fs::read_to_string(&head_file) {
@@ -332,7 +347,7 @@ fn update_branch_head(repo_root: &PathBuf, branch: &str, commit_hash: &str) -> R
             fs::write(head_file, commit_hash)?;
         }
     }
-    
+
     Ok(())
 }
 
@@ -355,10 +370,10 @@ mod tests {
                 content_hash: Some("def456".to_string()),
             }],
         };
-        
+
         let json = serde_json::to_string(&commit).unwrap();
         let deserialized: Commit = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(commit.hash, deserialized.hash);
         assert_eq!(commit.message, deserialized.message);
     }
@@ -370,7 +385,7 @@ mod tests {
             head_commit: "abc123".to_string(),
             remote_tracking: Some("origin/main".to_string()),
         };
-        
+
         assert_eq!(branch.name, "main");
         assert_eq!(branch.head_commit, "abc123");
     }

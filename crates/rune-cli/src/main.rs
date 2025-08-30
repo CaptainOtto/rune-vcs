@@ -6,16 +6,19 @@ use rune_store::Store;
 pub mod commands;
 mod style;
 use anyhow::Context;
-use colored::{Color, ColoredString, Colorize};  // Import specific items to avoid Style conflict
+use colored::{Color, ColoredString, Colorize}; // Import specific items to avoid Style conflict
 use rune_core::ignore::{IgnoreEngine, IgnoreRule, RuleType};
 use rune_docs::DocsEngine;
-use rune_performance::{PerformanceEngine, AdvancedPerformanceEngine, PerformanceConfig, NetworkStorageEngine, PerformanceMonitor};
+use rune_performance::{
+    AdvancedPerformanceEngine, NetworkStorageEngine, PerformanceConfig, PerformanceEngine,
+    PerformanceMonitor,
+};
 use style::{init_colors, Style};
 pub mod intelligence;
 use chrono;
 use intelligence::IntelligentFileAnalyzer;
-use std::{collections::HashSet, fs, io::Write, path::PathBuf};
 use num_cpus;
+use std::{collections::HashSet, fs, io::Write, path::PathBuf};
 
 /// Global execution context carrying user preferences
 #[derive(Debug, Clone)]
@@ -672,7 +675,11 @@ enum BenchmarkCmd {
     Report {
         #[arg(long, help = "Include historical trends")]
         trends: bool,
-        #[arg(long, help = "Output format (table, json, html)", default_value = "table")]
+        #[arg(
+            long,
+            help = "Output format (table, json, html)",
+            default_value = "table"
+        )]
         format: String,
         #[arg(long, help = "Save report to file")]
         output: Option<std::path::PathBuf>,
@@ -2003,7 +2010,11 @@ async fn main() -> anyhow::Result<()> {
                 ));
             }
         }
-        Cmd::Clone { url, directory, token } => {
+        Cmd::Clone {
+            url,
+            directory,
+            token,
+        } => {
             let args = crate::commands::clone::CloneArgs {
                 url: url.clone(),
                 directory: directory.clone(),
@@ -2091,42 +2102,45 @@ async fn main() -> anyhow::Result<()> {
 
                 // For multiple files, use advanced parallel processing (without async runtime)
                 if paths.len() > 5 {
-                    Style::info("🚀 Detected multiple files, enabling advanced parallel processing...");
-                    
-                    let advanced_engine = AdvancedPerformanceEngine::with_config(PerformanceConfig {
-                        max_parallel_operations: num_cpus::get().min(8),
-                        cache_size_mb: 128,
-                        enable_memory_mapping: true,
-                        enable_parallel_diff: true,
-                        enable_async_io: false, // Disable async for CLI context
-                        bandwidth_limit_mbps: None,
-                    });
+                    Style::info(
+                        "🚀 Detected multiple files, enabling advanced parallel processing...",
+                    );
+
+                    let advanced_engine =
+                        AdvancedPerformanceEngine::with_config(PerformanceConfig {
+                            max_parallel_operations: num_cpus::get().min(8),
+                            cache_size_mb: 128,
+                            enable_memory_mapping: true,
+                            enable_parallel_diff: true,
+                            enable_async_io: false, // Disable async for CLI context
+                            bandwidth_limit_mbps: None,
+                        });
 
                     // Process files in parallel using rayon (sync parallel processing)
                     let file_paths: Vec<PathBuf> = paths.clone();
-                    
+
                     use rayon::prelude::*;
                     let results: Result<Vec<_>, _> = file_paths
                         .par_iter()
                         .map(|file_path| {
                             let rel = file_path.to_string_lossy().to_string();
-                            
+
                             // Create local store and analyzer for this thread
                             let local_store = Store::discover(std::env::current_dir()?)?;
                             let mut local_analyzer = IntelligentFileAnalyzer::new();
-                            
+
                             // Intelligence analysis
                             let _ = local_analyzer.analyze_file(&rel);
-                            
+
                             // Stage the file
                             local_store.stage_file(&rel)
                         })
                         .collect();
-                    
+
                     match results {
                         Ok(stage_results) => {
                             added_count = stage_results.len();
-                            
+
                             // Show summary for many files
                             if added_count <= 10 {
                                 for path in &paths {
@@ -2139,7 +2153,7 @@ async fn main() -> anyhow::Result<()> {
                                 }
                                 println!("... and {} more files", added_count - 10);
                             }
-                            
+
                             advanced_engine.print_performance_summary();
                         }
                         Err(e) => {
@@ -2158,9 +2172,7 @@ async fn main() -> anyhow::Result<()> {
                         let _ = analyzer.analyze_file(&rel);
 
                         // Use performance benchmarking for file operations
-                        let stage_result = engine.benchmark("stage_file", || {
-                            s.stage_file(&rel)
-                        });
+                        let stage_result = engine.benchmark("stage_file", || s.stage_file(&rel));
 
                         match stage_result {
                             Ok(_) => {
@@ -2199,14 +2211,14 @@ async fn main() -> anyhow::Result<()> {
 
             // Initialize network storage optimization for large commits
             let network_engine = NetworkStorageEngine::new();
-            
+
             // Get staged files for compression analysis
             let idx = s.read_index()?;
             let staged_files: Vec<_> = idx.entries.keys().cloned().collect();
-            
+
             if staged_files.len() > 3 {
                 Style::info("🌐 Enabling network storage optimization for large commit...");
-                
+
                 // Compress staged files with delta compression v2.0
                 for file_path in &staged_files {
                     if let Ok(path) = std::path::Path::new(file_path).canonicalize() {
@@ -2214,11 +2226,13 @@ async fn main() -> anyhow::Result<()> {
                             // Apply delta compression v2.0 for files > 1KB
                             match network_engine.delta_compress_v2(&path, None) {
                                 Ok(result) => {
-                                    println!("🗜️  Compressed {}: {} → {} ({:.1}% reduction)", 
-                                             file_path,
-                                             format_bytes(result.original_size),
-                                             format_bytes(result.compressed_size),
-                                             (1.0 - result.compression_ratio) * 100.0);
+                                    println!(
+                                        "🗜️  Compressed {}: {} → {} ({:.1}% reduction)",
+                                        file_path,
+                                        format_bytes(result.original_size),
+                                        format_bytes(result.compressed_size),
+                                        (1.0 - result.compression_ratio) * 100.0
+                                    );
                                 }
                                 Err(_) => {
                                     // Compression failed, continue with original file
@@ -2227,7 +2241,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
-                
+
                 network_engine.print_performance_summary();
             }
 
@@ -2245,14 +2259,22 @@ async fn main() -> anyhow::Result<()> {
                     Style::commit_hash(&c.id[..8]),
                     message
                 ));
-                
+
                 // Show commit size optimization summary
                 if staged_files.len() > 3 {
-                    println!("📦 Commit optimized with {} file compression", staged_files.len());
+                    println!(
+                        "📦 Commit optimized with {} file compression",
+                        staged_files.len()
+                    );
                 }
             }
         }
-        Cmd::Log { format, graph, oneline, max_count } => {
+        Cmd::Log {
+            format,
+            graph,
+            oneline,
+            max_count,
+        } => {
             let s = Store::discover(std::env::current_dir()?)?;
             let mut list = s.log();
             let fmt = format.as_str();
@@ -2651,13 +2673,21 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Cmd::Tree { path, all, tracked_only } => {
+        Cmd::Tree {
+            path,
+            all,
+            tracked_only,
+        } => {
             let s = Store::discover(std::env::current_dir()?)?;
             let start_path = path.unwrap_or_else(|| std::env::current_dir().unwrap());
             display_file_tree(&s, &start_path, all, tracked_only)?;
         }
 
-        Cmd::LsFiles { cached, modified, stage } => {
+        Cmd::LsFiles {
+            cached,
+            modified,
+            stage,
+        } => {
             let s = Store::discover(std::env::current_dir()?)?;
             list_repository_files(&s, cached, modified, stage)?;
         }
@@ -2909,7 +2939,7 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Tutorial { cmd } => {
             handle_tutorial_command(cmd, &ctx).await?;
         }
-        
+
         Cmd::Benchmark { cmd } => {
             handle_benchmark_command(cmd, &ctx).await?;
         }
@@ -3219,10 +3249,15 @@ fn blame_file(store: &Store, file_path: &PathBuf, line_range: Option<&str>) -> a
     Ok(())
 }
 
-fn display_file_tree(store: &rune_store::Store, path: &std::path::Path, show_all: bool, tracked_only: bool) -> anyhow::Result<()> {
+fn display_file_tree(
+    store: &rune_store::Store,
+    path: &std::path::Path,
+    show_all: bool,
+    tracked_only: bool,
+) -> anyhow::Result<()> {
     use colored::*;
     use std::collections::HashSet;
-    
+
     // Get staged/tracked files if needed
     let tracked_files = if tracked_only {
         let index = store.read_index()?;
@@ -3231,40 +3266,57 @@ fn display_file_tree(store: &rune_store::Store, path: &std::path::Path, show_all
         None
     };
 
-    println!("{}", format!("📁 Repository Tree: {}", style::Style::file_path(&path.display().to_string())).cyan().bold());
+    println!(
+        "{}",
+        format!(
+            "📁 Repository Tree: {}",
+            style::Style::file_path(&path.display().to_string())
+        )
+        .cyan()
+        .bold()
+    );
     println!();
 
-    display_tree_recursive(store, path, "", show_all, tracked_only, tracked_files.as_ref(), 0)?;
+    display_tree_recursive(
+        store,
+        path,
+        "",
+        show_all,
+        tracked_only,
+        tracked_files.as_ref(),
+        0,
+    )?;
     Ok(())
 }
 
 fn display_tree_recursive(
-    store: &rune_store::Store, 
-    dir: &std::path::Path, 
-    prefix: &str, 
-    show_all: bool, 
+    store: &rune_store::Store,
+    dir: &std::path::Path,
+    prefix: &str,
+    show_all: bool,
     tracked_only: bool,
     tracked_files: Option<&HashSet<String>>,
-    depth: usize
+    depth: usize,
 ) -> anyhow::Result<()> {
     use colored::*;
-    
-    if depth > 10 { // Prevent infinite recursion
+
+    if depth > 10 {
+        // Prevent infinite recursion
         return Ok(());
     }
 
     let mut entries = std::fs::read_dir(dir)?
         .filter_map(|entry| entry.ok())
         .collect::<Vec<_>>();
-    
+
     entries.sort_by_key(|entry| entry.file_name());
 
     let repo_root = &store.root;
-    
+
     for (i, entry) in entries.iter().enumerate() {
         let file_name = entry.file_name();
         let file_name_str = file_name.to_string_lossy();
-        
+
         // Skip hidden files unless --all is specified
         if !show_all && file_name_str.starts_with('.') {
             continue;
@@ -3278,15 +3330,16 @@ fn display_tree_recursive(
         let path = entry.path();
         let is_last = i == entries.len() - 1;
         let connector = if is_last { "└── " } else { "├── " };
-        
+
         // Check if file is tracked
-        let relative_path = path.strip_prefix(repo_root)
+        let relative_path = path
+            .strip_prefix(repo_root)
             .unwrap_or(&path)
             .to_string_lossy()
             .to_string();
-            
+
         let is_tracked = tracked_files.map_or(true, |files| files.contains(&relative_path));
-        
+
         if tracked_only && !is_tracked {
             continue;
         }
@@ -3309,18 +3362,31 @@ fn display_tree_recursive(
 
         if path.is_dir() {
             let new_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
-            display_tree_recursive(store, &path, &new_prefix, show_all, tracked_only, tracked_files, depth + 1)?;
+            display_tree_recursive(
+                store,
+                &path,
+                &new_prefix,
+                show_all,
+                tracked_only,
+                tracked_files,
+                depth + 1,
+            )?;
         }
     }
 
     Ok(())
 }
 
-fn list_repository_files(store: &rune_store::Store, cached: bool, modified: bool, stage: bool) -> anyhow::Result<()> {
+fn list_repository_files(
+    store: &rune_store::Store,
+    cached: bool,
+    modified: bool,
+    stage: bool,
+) -> anyhow::Result<()> {
     use colored::*;
-    
+
     let index = store.read_index()?;
-    
+
     if cached {
         // Show only staged files
         println!("{}", "📋 Staged Files:".cyan().bold());
@@ -3345,32 +3411,32 @@ fn list_repository_files(store: &rune_store::Store, cached: bool, modified: bool
     } else {
         // Show all tracked files
         println!("{}", "📄 All Tracked Files:".cyan().bold());
-        
+
         // Get all files that have ever been committed
         let log = store.log();
         let mut all_files = std::collections::HashSet::new();
-        
+
         for commit in &log {
             for file in &commit.files {
                 all_files.insert(file.clone());
             }
         }
-        
+
         // Add currently staged files
         for file in index.entries.keys() {
             all_files.insert(file.clone());
         }
-        
+
         let mut files: Vec<_> = all_files.into_iter().collect();
         files.sort();
-        
+
         for file in files {
             let status = if index.entries.contains_key(&file) {
                 "M" // Modified/staged
             } else {
                 " " // Committed
             };
-            
+
             if stage {
                 println!("{} {}", status.green(), style::Style::file_path(&file));
             } else {
@@ -3378,26 +3444,34 @@ fn list_repository_files(store: &rune_store::Store, cached: bool, modified: bool
             }
         }
     }
-    
+
     Ok(())
 }
 
-fn display_commit_graph(commits: &[rune_core::Commit], show_graph: bool, oneline: bool) -> anyhow::Result<()> {
+fn display_commit_graph(
+    commits: &[rune_core::Commit],
+    show_graph: bool,
+    oneline: bool,
+) -> anyhow::Result<()> {
     use colored::*;
-    
+
     if commits.is_empty() {
         return Ok(());
     }
 
     // Build a simple parent-child relationship map
-    let mut children: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
-    let commit_map: std::collections::HashMap<String, &rune_core::Commit> = 
+    let mut children: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    let commit_map: std::collections::HashMap<String, &rune_core::Commit> =
         commits.iter().map(|c| (c.id.clone(), c)).collect();
 
     // Build children map (reverse of parent relationship)
     for commit in commits {
         if let Some(parent_id) = &commit.parent {
-            children.entry(parent_id.clone()).or_insert_with(Vec::new).push(commit.id.clone());
+            children
+                .entry(parent_id.clone())
+                .or_insert_with(Vec::new)
+                .push(commit.id.clone());
         }
     }
 
@@ -3418,13 +3492,14 @@ fn display_commit_graph(commits: &[rune_core::Commit], show_graph: bool, oneline
             } else {
                 "o " // Root commit
             };
-            
+
             print!("{}", graph_part.yellow().bold());
         }
 
         if oneline {
             // Compact one-line format
-            println!("{} {} {} ({})", 
+            println!(
+                "{} {} {} ({})",
                 style::Style::commit_hash(&commit.id[..8]),
                 truncate_string(&commit.message, 60),
                 commit.author.name.dimmed(),
@@ -3444,7 +3519,7 @@ fn display_commit_graph(commits: &[rune_core::Commit], show_graph: bool, oneline
             );
             println!();
             println!("    {}", commit.message);
-            
+
             if !commit.files.is_empty() {
                 println!();
                 println!("    Files changed:");
@@ -3798,11 +3873,15 @@ async fn handle_benchmark_command(cmd: BenchmarkCmd, ctx: &RuneContext) -> anyho
     let monitor = PerformanceMonitor::new();
 
     match cmd {
-        BenchmarkCmd::Run { suite, format, output } => {
+        BenchmarkCmd::Run {
+            suite,
+            format,
+            output,
+        } => {
             ctx.info(&format!("🚀 Running {} benchmark suite...", suite));
-            
+
             let result = monitor.run_benchmark_suite(&suite).await?;
-            
+
             match format.as_str() {
                 "json" => {
                     let json_output = serde_json::to_string_pretty(&result)?;
@@ -3815,69 +3894,91 @@ async fn handle_benchmark_command(cmd: BenchmarkCmd, ctx: &RuneContext) -> anyho
                 }
                 "table" | _ => {
                     Style::section_header(&format!("📊 {} Benchmark Results", suite));
-                    
+
                     println!("\n🎯 {}", "Performance Summary".bold());
                     println!("  ⏱️  Duration: {:.2?}", result.duration);
                     println!("  🚀 Operations/sec: {:.1}", result.operations_per_second);
-                    println!("  🧠 Peak Memory: {}", format_bytes(result.peak_memory_usage as usize));
+                    println!(
+                        "  🧠 Peak Memory: {}",
+                        format_bytes(result.peak_memory_usage as usize)
+                    );
                     println!("  💻 Peak CPU: {:.1}%", result.peak_cpu_usage);
                     println!("  🎯 Cache Hit Ratio: {:.1}%", result.cache_hit_ratio);
                     println!("  ✅ Success Rate: {:.1}%", result.success_rate);
-                    
+
                     if !result.bottlenecks.is_empty() {
                         println!("\n⚠️  {}", "Performance Bottlenecks".bold());
                         for bottleneck in &result.bottlenecks {
                             let severity_icon = match bottleneck.severity {
                                 rune_performance::BottleneckSeverity::Low => "🟡",
-                                rune_performance::BottleneckSeverity::Medium => "🟠", 
+                                rune_performance::BottleneckSeverity::Medium => "🟠",
                                 rune_performance::BottleneckSeverity::High => "🔴",
                                 rune_performance::BottleneckSeverity::Critical => "🚨",
                             };
-                            println!("  {} {} (Impact: {:.1}%)", severity_icon, bottleneck.description, bottleneck.impact);
+                            println!(
+                                "  {} {} (Impact: {:.1}%)",
+                                severity_icon, bottleneck.description, bottleneck.impact
+                            );
                             for rec in &bottleneck.recommendations {
                                 println!("    💡 {}", rec);
                             }
                         }
                     }
-                    
+
                     if let Some(output_path) = output {
                         let json_output = serde_json::to_string_pretty(&result)?;
                         std::fs::write(&output_path, &json_output)?;
-                        ctx.info(&format!("Detailed results saved to {}", output_path.display()));
+                        ctx.info(&format!(
+                            "Detailed results saved to {}",
+                            output_path.display()
+                        ));
                     }
                 }
             }
         }
 
         BenchmarkCmd::Monitor { interval, history } => {
-            ctx.info(&format!("📊 Starting performance monitor ({}s intervals, {} history entries)", interval, history));
+            ctx.info(&format!(
+                "📊 Starting performance monitor ({}s intervals, {} history entries)",
+                interval, history
+            ));
             Style::section_header("Real-time Performance Monitor");
-            
+
             // Simple monitoring loop - in a real implementation this would be more sophisticated
             for i in 0..10 {
                 tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
-                
+
                 let metrics = monitor.get_current_metrics();
-                println!("\n📈 Sample {} - {} UTC", 
-                    i + 1, 
+                println!(
+                    "\n📈 Sample {} - {} UTC",
+                    i + 1,
                     chrono::Utc::now().format("%H:%M:%S")
                 );
                 println!("  CPU: {:.1}%", metrics.cpu_usage);
                 println!("  Memory: {}", format_bytes(metrics.memory_usage as usize));
-                println!("  Cache Hit Ratio: {:.1}%", metrics.cache_performance.hit_ratio);
-                
+                println!(
+                    "  Cache Hit Ratio: {:.1}%",
+                    metrics.cache_performance.hit_ratio
+                );
+
                 if i >= 9 {
-                    ctx.info("Monitor completed. Use 'rune benchmark report' for detailed analysis.");
+                    ctx.info(
+                        "Monitor completed. Use 'rune benchmark report' for detailed analysis.",
+                    );
                     break;
                 }
             }
         }
 
-        BenchmarkCmd::Report { trends, format, output } => {
+        BenchmarkCmd::Report {
+            trends,
+            format,
+            output,
+        } => {
             ctx.info("📋 Generating comprehensive performance report...");
-            
+
             let report = monitor.generate_performance_report();
-            
+
             match format.as_str() {
                 "json" => {
                     let json_output = serde_json::to_string_pretty(&report)?;
@@ -3899,12 +4000,18 @@ async fn handle_benchmark_command(cmd: BenchmarkCmd, ctx: &RuneContext) -> anyho
                 }
                 "table" | _ => {
                     Style::section_header("📊 Performance Report");
-                    
+
                     println!("\n🎯 {}", "Current Metrics".bold());
                     println!("  💻 CPU Usage: {:.1}%", report.current_metrics.cpu_usage);
-                    println!("  🧠 Memory Usage: {}", format_bytes(report.current_metrics.memory_usage as usize));
-                    println!("  💾 Cache Hit Ratio: {:.1}%", report.current_metrics.cache_performance.hit_ratio);
-                    
+                    println!(
+                        "  🧠 Memory Usage: {}",
+                        format_bytes(report.current_metrics.memory_usage as usize)
+                    );
+                    println!(
+                        "  💾 Cache Hit Ratio: {:.1}%",
+                        report.current_metrics.cache_performance.hit_ratio
+                    );
+
                     if trends && !report.historical_trends.is_empty() {
                         println!("\n📈 {}", "Historical Trends".bold());
                         for trend in &report.historical_trends {
@@ -3913,21 +4020,27 @@ async fn handle_benchmark_command(cmd: BenchmarkCmd, ctx: &RuneContext) -> anyho
                                 rune_performance::TrendDirection::Degrading => "📉",
                                 rune_performance::TrendDirection::Stable => "➡️",
                             };
-                            println!("  {} {}: {:.1}% change", direction_icon, trend.metric, trend.change_percentage);
+                            println!(
+                                "  {} {}: {:.1}% change",
+                                direction_icon, trend.metric, trend.change_percentage
+                            );
                         }
                     }
-                    
+
                     if !report.recommendations.is_empty() {
                         println!("\n💡 {}", "Recommendations".bold());
                         for rec in &report.recommendations {
                             println!("  • {}", rec);
                         }
                     }
-                    
+
                     if let Some(output_path) = output {
                         let json_output = serde_json::to_string_pretty(&report)?;
                         std::fs::write(&output_path, &json_output)?;
-                        ctx.info(&format!("Detailed report saved to {}", output_path.display()));
+                        ctx.info(&format!(
+                            "Detailed report saved to {}",
+                            output_path.display()
+                        ));
                     }
                 }
             }
@@ -3935,21 +4048,47 @@ async fn handle_benchmark_command(cmd: BenchmarkCmd, ctx: &RuneContext) -> anyho
 
         BenchmarkCmd::List => {
             Style::section_header("📋 Available Benchmark Suites");
-            
+
             println!("\n🚀 {}", "Performance Benchmark Suites".bold());
-            println!("  {} comprehensive    - Full performance evaluation", Style::status_added());
-            println!("  {} large_repository - Linux kernel scale repository testing", Style::status_added());
-            println!("  {} network_latency  - Network performance simulation", Style::status_added());
-            println!("  {} memory_usage     - Memory pressure testing", Style::status_added());
-            println!("  {} disk_io          - Disk I/O performance evaluation", Style::status_added());
-            
+            println!(
+                "  {} comprehensive    - Full performance evaluation",
+                Style::status_added()
+            );
+            println!(
+                "  {} large_repository - Linux kernel scale repository testing",
+                Style::status_added()
+            );
+            println!(
+                "  {} network_latency  - Network performance simulation",
+                Style::status_added()
+            );
+            println!(
+                "  {} memory_usage     - Memory pressure testing",
+                Style::status_added()
+            );
+            println!(
+                "  {} disk_io          - Disk I/O performance evaluation",
+                Style::status_added()
+            );
+
             println!("\n📊 {}", "Monitoring Options".bold());
-            println!("  {} rune benchmark monitor     - Real-time performance monitoring", Style::status_added());
-            println!("  {} rune benchmark report      - Generate performance report", Style::status_added());
-            println!("  {} rune benchmark run --suite comprehensive - Run full benchmark", Style::status_added());
-            
+            println!(
+                "  {} rune benchmark monitor     - Real-time performance monitoring",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune benchmark report      - Generate performance report",
+                Style::status_added()
+            );
+            println!(
+                "  {} rune benchmark run --suite comprehensive - Run full benchmark",
+                Style::status_added()
+            );
+
             println!("\n💡 {}", "Example Commands".bold());
-            println!("  rune benchmark run --suite comprehensive --format json --output results.json");
+            println!(
+                "  rune benchmark run --suite comprehensive --format json --output results.json"
+            );
             println!("  rune benchmark monitor --interval 5 --history 50");
             println!("  rune benchmark report --trends --format html --output report.html");
         }
@@ -3959,12 +4098,16 @@ async fn handle_benchmark_command(cmd: BenchmarkCmd, ctx: &RuneContext) -> anyho
 }
 
 /// Generate HTML performance report
-fn generate_html_report(report: &rune_performance::PerformanceReport, include_trends: bool) -> anyhow::Result<String> {
+fn generate_html_report(
+    report: &rune_performance::PerformanceReport,
+    include_trends: bool,
+) -> anyhow::Result<String> {
     let timestamp = chrono::DateTime::from_timestamp(report.timestamp as i64, 0)
         .unwrap_or_else(|| chrono::Utc::now())
         .format("%Y-%m-%d %H:%M:%S UTC");
 
-    let mut html = format!(r#"
+    let mut html = format!(
+        r#"
 <!DOCTYPE html>
 <html>
 <head>
@@ -3991,7 +4134,7 @@ fn generate_html_report(report: &rune_performance::PerformanceReport, include_tr
         <p><strong>Memory Usage:</strong> {}</p>
         <p><strong>Cache Hit Ratio:</strong> {:.1}%</p>
     </div>
-"#, 
+"#,
         timestamp,
         report.current_metrics.cpu_usage,
         format_bytes(report.current_metrics.memory_usage as usize),
@@ -3999,14 +4142,16 @@ fn generate_html_report(report: &rune_performance::PerformanceReport, include_tr
     );
 
     if include_trends && !report.historical_trends.is_empty() {
-        html.push_str(r#"
+        html.push_str(
+            r#"
     <div class="metric">
         <h2>📈 Historical Trends</h2>
-"#);
+"#,
+        );
         for trend in &report.historical_trends {
             let class = match trend.direction {
                 rune_performance::TrendDirection::Improving => "trend-improving",
-                rune_performance::TrendDirection::Degrading => "trend-degrading", 
+                rune_performance::TrendDirection::Degrading => "trend-degrading",
                 rune_performance::TrendDirection::Stable => "trend-stable",
             };
             html.push_str(&format!(
@@ -4018,11 +4163,13 @@ fn generate_html_report(report: &rune_performance::PerformanceReport, include_tr
     }
 
     if !report.recommendations.is_empty() {
-        html.push_str(r#"
+        html.push_str(
+            r#"
     <div class="recommendations">
         <h2>💡 Recommendations</h2>
         <ul>
-"#);
+"#,
+        );
         for rec in &report.recommendations {
             html.push_str(&format!("            <li>{}</li>\n", rec));
         }
@@ -4038,11 +4185,11 @@ fn format_bytes(bytes: usize) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
     let mut size = bytes as f64;
     let mut unit_index = 0;
-    
+
     while size >= 1024.0 && unit_index < UNITS.len() - 1 {
         size /= 1024.0;
         unit_index += 1;
     }
-    
+
     format!("{:.1}{}", size, UNITS[unit_index])
 }

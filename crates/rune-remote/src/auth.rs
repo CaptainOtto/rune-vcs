@@ -1,12 +1,12 @@
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use axum::{
     extract::{Request, State},
     http::{HeaderMap, StatusCode},
     middleware::Next,
     response::Response,
 };
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiToken {
@@ -42,7 +42,11 @@ impl AuthService {
         }
     }
 
-    pub fn generate_token(&mut self, user_id: String, permissions: Vec<Permission>) -> Result<String> {
+    pub fn generate_token(
+        &mut self,
+        user_id: String,
+        permissions: Vec<Permission>,
+    ) -> Result<String> {
         let token = format!("rune_{}_{}", user_id, chrono::Utc::now().timestamp());
         let api_token = ApiToken {
             token: token.clone(),
@@ -51,7 +55,7 @@ impl AuthService {
             expires_at: Some(chrono::Utc::now() + chrono::Duration::days(30)),
             created_at: chrono::Utc::now(),
         };
-        
+
         self.tokens.insert(token.clone(), api_token);
         Ok(token)
     }
@@ -59,7 +63,12 @@ impl AuthService {
     pub fn generate_server_token(&mut self, server_id: String) -> Result<String> {
         let token = self.generate_token(
             format!("server_{}", server_id),
-            vec![Permission::Read, Permission::Write, Permission::LfsUpload, Permission::LfsDownload]
+            vec![
+                Permission::Read,
+                Permission::Write,
+                Permission::LfsUpload,
+                Permission::LfsDownload,
+            ],
         )?;
         self.server_tokens.insert(server_id, token.clone());
         Ok(token)
@@ -67,20 +76,21 @@ impl AuthService {
 
     pub fn validate_token(&self, token: &str) -> Option<&ApiToken> {
         let api_token = self.tokens.get(token)?;
-        
+
         // Check if token is expired
         if let Some(expires_at) = api_token.expires_at {
             if chrono::Utc::now() > expires_at {
                 return None;
             }
         }
-        
+
         Some(api_token)
     }
 
     pub fn has_permission(&self, token: &str, permission: Permission) -> bool {
         if let Some(api_token) = self.validate_token(token) {
-            api_token.permissions.contains(&permission) || api_token.permissions.contains(&Permission::Admin)
+            api_token.permissions.contains(&permission)
+                || api_token.permissions.contains(&Permission::Admin)
         } else {
             false
         }
@@ -127,8 +137,20 @@ pub async fn auth_middleware(
 }
 
 // Middleware for specific permissions
-pub fn require_permission(permission: Permission) -> impl Fn(State<std::sync::Arc<std::sync::Mutex<AuthService>>>, HeaderMap, Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, StatusCode>> + Send>> + Clone {
-    move |State(auth): State<std::sync::Arc<std::sync::Mutex<AuthService>>>, headers: HeaderMap, request: Request, next: Next| {
+pub fn require_permission(
+    permission: Permission,
+) -> impl Fn(
+    State<std::sync::Arc<std::sync::Mutex<AuthService>>>,
+    HeaderMap,
+    Request,
+    Next,
+) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<Response, StatusCode>> + Send>,
+> + Clone {
+    move |State(auth): State<std::sync::Arc<std::sync::Mutex<AuthService>>>,
+          headers: HeaderMap,
+          request: Request,
+          next: Next| {
         let perm = permission.clone();
         Box::pin(async move {
             // Extract token from Authorization header
@@ -143,7 +165,7 @@ pub fn require_permission(permission: Permission) -> impl Fn(State<std::sync::Ar
                 let auth_guard = auth.lock().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                 auth_guard.has_permission(token, perm)
             }; // Drop the lock here
-            
+
             if !has_permission {
                 return Err(StatusCode::FORBIDDEN);
             }
@@ -180,11 +202,13 @@ mod tests {
     #[test]
     fn test_token_generation() {
         let mut auth = AuthService::new();
-        let token = auth.generate_token(
-            "test_user".to_string(),
-            vec![Permission::Read, Permission::Write]
-        ).unwrap();
-        
+        let token = auth
+            .generate_token(
+                "test_user".to_string(),
+                vec![Permission::Read, Permission::Write],
+            )
+            .unwrap();
+
         assert!(!token.is_empty());
         assert!(token.starts_with("rune_test_user_"));
         assert!(auth.validate_token(&token).is_some());
@@ -194,7 +218,7 @@ mod tests {
     fn test_server_token_generation() {
         let mut auth = AuthService::new();
         let token = auth.generate_server_token("server1".to_string()).unwrap();
-        
+
         assert!(!token.is_empty());
         assert!(auth.validate_token(&token).is_some());
         assert!(auth.has_permission(&token, Permission::Read));
@@ -204,11 +228,10 @@ mod tests {
     #[test]
     fn test_permission_checking() {
         let mut auth = AuthService::new();
-        let token = auth.generate_token(
-            "test_user".to_string(),
-            vec![Permission::Read]
-        ).unwrap();
-        
+        let token = auth
+            .generate_token("test_user".to_string(), vec![Permission::Read])
+            .unwrap();
+
         assert!(auth.has_permission(&token, Permission::Read));
         assert!(!auth.has_permission(&token, Permission::Write));
         assert!(!auth.has_permission(&token, Permission::Admin));
@@ -217,11 +240,10 @@ mod tests {
     #[test]
     fn test_admin_permission() {
         let mut auth = AuthService::new();
-        let token = auth.generate_token(
-            "admin_user".to_string(),
-            vec![Permission::Admin]
-        ).unwrap();
-        
+        let token = auth
+            .generate_token("admin_user".to_string(), vec![Permission::Admin])
+            .unwrap();
+
         // Admin should have all permissions
         assert!(auth.has_permission(&token, Permission::Read));
         assert!(auth.has_permission(&token, Permission::Write));
@@ -232,11 +254,10 @@ mod tests {
     #[test]
     fn test_token_revocation() {
         let mut auth = AuthService::new();
-        let token = auth.generate_token(
-            "test_user".to_string(),
-            vec![Permission::Read]
-        ).unwrap();
-        
+        let token = auth
+            .generate_token("test_user".to_string(), vec![Permission::Read])
+            .unwrap();
+
         assert!(auth.validate_token(&token).is_some());
         assert!(auth.revoke_token(&token));
         assert!(auth.validate_token(&token).is_none());

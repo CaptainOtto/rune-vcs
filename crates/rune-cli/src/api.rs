@@ -1,14 +1,14 @@
 use anyhow::Result;
 use axum::{
     extract::Path,
+    http::StatusCode,
     response::Html,
     routing::{get, post},
     Json, Router,
-    http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
-use tower_http::services::ServeDir;
 use std::net::SocketAddr;
+use tower_http::services::ServeDir;
 
 #[derive(Serialize, Deserialize)]
 struct CommitReq {
@@ -318,27 +318,27 @@ async fn unlock(Json(req): Json<UnlockReq>) -> Json<serde_json::Value> {
 async fn tree() -> Json<serde_json::Value> {
     let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
     let mut files = Vec::new();
-    
+
     if let Ok(entries) = std::fs::read_dir(&s.root) {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
-            
+
             if name.starts_with('.') && name != ".gitignore" {
                 continue;
             }
-            
+
             files.push(serde_json::json!({
                 "name": name,
                 "path": path.strip_prefix(&s.root).unwrap_or(&path).to_string_lossy(),
                 "type": if path.is_dir() { "directory" } else { "file" },
-                "size": if path.is_file() { 
-                    std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) 
+                "size": if path.is_file() {
+                    std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
                 } else { 0 }
             }));
         }
     }
-    
+
     Json(serde_json::json!({
         "files": files,
         "root": s.root.to_string_lossy()
@@ -349,29 +349,32 @@ async fn files() -> Json<serde_json::Value> {
     let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
     let index = s.read_index().unwrap();
     let log = s.log();
-    
+
     let mut all_files = std::collections::HashSet::new();
     for commit in &log {
         for file in &commit.files {
             all_files.insert(file.clone());
         }
     }
-    
-    let files: Vec<_> = all_files.into_iter().map(|file| {
-        serde_json::json!({
-            "path": file,
-            "staged": index.entries.contains_key(&file),
-            "status": if index.entries.contains_key(&file) { "modified" } else { "committed" }
+
+    let files: Vec<_> = all_files
+        .into_iter()
+        .map(|file| {
+            serde_json::json!({
+                "path": file,
+                "staged": index.entries.contains_key(&file),
+                "status": if index.entries.contains_key(&file) { "modified" } else { "committed" }
+            })
         })
-    }).collect();
-    
+        .collect();
+
     Json(serde_json::json!({"files": files}))
 }
 
 async fn show_commit(Path(commit_id): Path<String>) -> Json<serde_json::Value> {
     let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
     let log = s.log();
-    
+
     if let Some(commit) = log.iter().find(|c| c.id.starts_with(&commit_id)) {
         Json(serde_json::json!({
             "commit": commit,
@@ -404,27 +407,29 @@ async fn repository_info() -> Json<serde_json::Value> {
 async fn changes() -> Json<serde_json::Value> {
     let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
     let idx = s.read_index().unwrap();
-    
+
     // Get staged files
-    let staged_files: Vec<serde_json::Value> = idx.entries.keys()
-        .map(|path| serde_json::json!({
-            "id": path,
-            "path": path,
-            "status": "modified",
-            "staged": true
-        }))
-        .collect();
-    
-    // Mock changelist for now
-    let changelists = vec![
-        serde_json::json!({
-            "id": "default",
-            "name": "Default Changelist",
-            "description": "Default changelist",
-            "files": staged_files
+    let staged_files: Vec<serde_json::Value> = idx
+        .entries
+        .keys()
+        .map(|path| {
+            serde_json::json!({
+                "id": path,
+                "path": path,
+                "status": "modified",
+                "staged": true
+            })
         })
-    ];
-    
+        .collect();
+
+    // Mock changelist for now
+    let changelists = vec![serde_json::json!({
+        "id": "default",
+        "name": "Default Changelist",
+        "description": "Default changelist",
+        "files": staged_files
+    })];
+
     Json(serde_json::json!({
         "changelists": changelists,
         "unstagedFiles": []
@@ -434,28 +439,31 @@ async fn changes() -> Json<serde_json::Value> {
 async fn history() -> Json<serde_json::Value> {
     let s = rune_store::Store::discover(std::env::current_dir().unwrap()).unwrap();
     let commits = s.log();
-    
-    let formatted_commits: Vec<serde_json::Value> = commits.into_iter()
-        .map(|commit| serde_json::json!({
-            "id": commit.id,
-            "message": commit.message,
-            "author": {
-                "name": commit.author.name,
-                "email": commit.author.email
-            },
-            "date": commit.time,
-            "branch": "main",
-            "parents": []
-        }))
+
+    let formatted_commits: Vec<serde_json::Value> = commits
+        .into_iter()
+        .map(|commit| {
+            serde_json::json!({
+                "id": commit.id,
+                "message": commit.message,
+                "author": {
+                    "name": commit.author.name,
+                    "email": commit.author.email
+                },
+                "date": commit.time,
+                "branch": "main",
+                "parents": []
+            })
+        })
         .collect();
-    
+
     Json(serde_json::json!({ "commits": formatted_commits }))
 }
 
 async fn file_tree() -> Json<serde_json::Value> {
     use std::fs;
     use std::path::Path;
-    
+
     fn build_tree_recursive(path: &Path, name: String) -> serde_json::Value {
         if path.is_dir() {
             let mut children = Vec::new();
@@ -484,10 +492,10 @@ async fn file_tree() -> Json<serde_json::Value> {
             })
         }
     }
-    
+
     let current_dir = std::env::current_dir().unwrap();
     let tree = build_tree_recursive(&current_dir, "root".to_string());
-    
+
     Json(tree)
 }
 

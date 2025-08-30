@@ -7,24 +7,24 @@ rule_files:
   # - "second_rules.yml"
 
 scrape_configs:
-  - job_name: 'rune-servers'
-    static_configs:
-      - targets: 
-          - 'rune-server-1:7421'
-          - 'rune-server-2:7421'
-    metrics_path: '/metrics'
-    scrape_interval: 10s
-
-  - job_name: 'rune-shrine'
+  - job_name: "rune-servers"
     static_configs:
       - targets:
-          - 'rune-server-1:7420'
-          - 'rune-server-2:7420'
-    metrics_path: '/metrics'
+          - "rune-server-1:7421"
+          - "rune-server-2:7421"
+    metrics_path: "/metrics"
     scrape_interval: 10s
 
-  - job_name: 'nginx'
+  - job_name: "rune-shrine"
     static_configs:
-      - targets: ['rune-nginx:80']
-    metrics_path: '/nginx_status'
+      - targets:
+          - "rune-server-1:7420"
+          - "rune-server-2:7420"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+
+  - job_name: "nginx"
+    static_configs:
+      - targets: ["rune-nginx:80"]
+    metrics_path: "/nginx_status"
     scrape_interval: 10s

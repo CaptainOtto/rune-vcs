@@ -186,6 +186,7 @@ docker-compose up -d
 ### Common Issues
 
 **Server won't start:**
+
 ```bash
 # Check logs
 docker-compose logs rune-server
@@ -195,6 +196,7 @@ netstat -tlnp | grep 8080
 ```
 
 **Can't connect from client:**
+
 ```bash
 # Test connectivity
 curl http://your-server:8080/health
@@ -204,6 +206,7 @@ sudo ufw status
 ```
 
 **Performance issues:**
+
 ```bash
 # Monitor resources
 docker stats
@@ -322,4 +325,4 @@ Rune VCS is open source under the Apache 2.0 License. See [LICENSE](LICENSE) for
 
 ---
 
-*Ready to revolutionize your version control? Start your Rune server today!* 🚀
+_Ready to revolutionize your version control? Start your Rune server today!_ 🚀

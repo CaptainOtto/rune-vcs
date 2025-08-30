@@ -1,0 +1,169 @@
+version: "3.8"
+
+services:
+  # Main Rune API Server
+  rune-server:
+    image: rune-vcs:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "${RUNE_API_PORT:-8421}:8421"
+      - "${RUNE_LFS_PORT:-8420}:8420"
+    environment:
+      - RUNE_AUTH_TOKEN=${RUNE_AUTH_TOKEN}
+      - RUNE_DATA_DIR=/data
+      - RUNE_LOG_LEVEL=${RUNE_LOG_LEVEL:-info}
+      - RUNE_DOMAIN=${RUNE_DOMAIN:-localhost}
+      - RUST_LOG=rune_remote=debug,rune_core=info
+    volumes:
+      - rune_data:/data
+      - rune_config:/config
+      - rune_logs:/logs
+      - ./server.yml:/config/server.yml:ro
+    networks:
+      - rune-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8421/sync/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - postgres
+
+  # Load Balancer / Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl:ro
+      - ./static:/var/www/static:ro
+    depends_on:
+      - rune-server
+    networks:
+      - rune-network
+    restart: unless-stopped
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - rune-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+
+  # PostgreSQL for metadata storage
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rune}
+      POSTGRES_USER: ${POSTGRES_USER:-rune}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - rune-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=200h"
+      - "--web.enable-lifecycle"
+    networks:
+      - rune-network
+    restart: unless-stopped
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - rune-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # Backup service
+  backup:
+    image: rune-vcs:latest
+    command: ["/usr/local/bin/backup.sh"]
+    environment:
+      - BACKUP_INTERVAL=${BACKUP_INTERVAL:-24h}
+      - BACKUP_RETENTION=${BACKUP_RETENTION:-30d}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - rune_data:/data:ro
+      - backup_data:/backups
+      - ./backup.sh:/usr/local/bin/backup.sh:ro
+    networks:
+      - rune-network
+    restart: unless-stopped
+    depends_on:
+      - rune-server
+
+# Named volumes for data persistence
+volumes:
+  rune_data:
+    driver: local
+  rune_config:
+    driver: local
+  rune_logs:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  backup_data:
+    driver: local
+
+# Network for service communication
+networks:
+  rune-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
