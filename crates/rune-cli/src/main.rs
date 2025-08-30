@@ -727,6 +727,78 @@ enum Cmd {
         #[command(subcommand)]
         cmd: Option<SmartBranchCommand>,
     },
+    
+    // ============ NATURAL LANGUAGE COMMANDS ============
+    /// Natural language: Undo last commit (git reset HEAD~1)
+    #[command(name = "undo")]
+    Undo {
+        #[arg(help = "What to undo: commit, merge, changes")]
+        what: Option<String>,
+        #[arg(long, help = "How many commits to undo")]
+        count: Option<u32>,
+        #[arg(long, help = "Keep changes in working directory")]
+        soft: bool,
+        #[arg(long, help = "Completely discard changes")]
+        hard: bool,
+    },
+    
+    /// Natural language: Show me what changed
+    #[command(name = "changed")]
+    Changed {
+        #[arg(help = "Time reference: today, yesterday, last-week, or specific date")]
+        since: Option<String>,
+        #[arg(short, long, help = "Show file names only")]
+        names_only: bool,
+        #[arg(short, long, help = "Show statistics")]
+        stats: bool,
+    },
+    
+    /// Natural language: What conflicts exist
+    #[command(name = "conflicts")]
+    Conflicts {
+        #[arg(long, help = "Show resolution suggestions")]
+        suggest: bool,
+        #[arg(long, help = "Auto-resolve safe conflicts")]
+        auto_resolve: bool,
+        #[arg(long, help = "Interactive conflict resolution")]
+        interactive: bool,
+    },
+    
+    /// Smart fix common repository issues
+    Fix {
+        #[arg(help = "What to fix: conflicts, formatting, permissions, corruption")]
+        issue: Option<String>,
+        #[arg(long, help = "Show what would be fixed without doing it")]
+        dry_run: bool,
+        #[arg(long, help = "Automatically fix all safe issues")]
+        auto: bool,
+        #[arg(long, help = "Interactive mode for complex fixes")]
+        interactive: bool,
+    },
+    
+    /// Optimize repository for better performance
+    Optimize {
+        #[arg(long, help = "Optimization level: basic, standard, aggressive")]
+        level: Option<String>,
+        #[arg(long, help = "Show optimization analysis")]
+        analyze: bool,
+        #[arg(long, help = "Dry run - show what would be optimized")]
+        dry_run: bool,
+        #[arg(long, help = "Include LFS optimization")]
+        lfs: bool,
+    },
+    
+    /// Interactive repository health check and maintenance
+    Health {
+        #[arg(long, help = "Show detailed health report")]
+        detailed: bool,
+        #[arg(long, help = "Include performance metrics")]
+        performance: bool,
+        #[arg(long, help = "Suggest improvements")]
+        suggestions: bool,
+        #[arg(long, help = "Auto-fix safe issues")]
+        auto_fix: bool,
+    },
     // ============ TRADITIONAL COMMANDS ============
     
     /// Clone a repository from a remote source
