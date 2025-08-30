@@ -14,10 +14,10 @@ class Rune < Formula
   depends_on "rust" => :build
 
   def install
-    bin.install "rune" => "rune-vcs"
+    bin.install "rune"
   end
 
   test do
-    system "#{bin}/rune-vcs", "--version"
+    system "#{bin}/rune", "--version"
   end
 end
