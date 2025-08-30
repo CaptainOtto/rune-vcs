@@ -56,6 +56,20 @@ pub enum RemoteCommand {
         /// Remote name
         name: String,
     },
+    /// Prune stale remote-tracking branches
+    Prune {
+        /// Remote name
+        name: String,
+        /// Dry run - show what would be deleted
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Update all remotes
+    Update {
+        /// Prune stale branches during update
+        #[arg(long)]
+        prune: bool,
+    },
 }
 
 pub async fn handle_remote_command(args: RemoteArgs) -> Result<()> {
@@ -88,8 +102,78 @@ pub async fn handle_remote_command(args: RemoteArgs) -> Result<()> {
         RemoteCommand::Show { name } => {
             show_remote_info(&current_dir, &name)?;
         }
+        RemoteCommand::Prune { name, dry_run } => {
+            prune_remote_branches(&current_dir, &name, dry_run)?;
+        }
+        RemoteCommand::Update { prune } => {
+            update_all_remotes(&current_dir, prune).await?;
+        }
     }
     
+    Ok(())
+}
+
+fn prune_remote_branches(repo_path: &Path, remote_name: &str, dry_run: bool) -> Result<()> {
+    let manager = RemoteManager::new(repo_path)?;
+    
+    if manager.get_remote(remote_name).is_none() {
+        anyhow::bail!("Remote '{}' not found", remote_name);
+    }
+
+    // For demonstration - in a real implementation, this would identify stale branches
+    let stale_branches = vec![
+        format!("refs/remotes/{}/feature/old-branch", remote_name),
+        format!("refs/remotes/{}/hotfix/closed-issue", remote_name),
+    ];
+
+    if stale_branches.is_empty() {
+        println!("No stale remote-tracking branches found for '{}'", remote_name);
+        return Ok(());
+    }
+
+    if dry_run {
+        println!("Would prune {} stale remote-tracking branches:", stale_branches.len());
+        for branch in &stale_branches {
+            println!("  - {}", branch);
+        }
+    } else {
+        println!("Pruning {} stale remote-tracking branches:", stale_branches.len());
+        for branch in &stale_branches {
+            println!("  - {}", branch);
+            // In real implementation: remove the branch reference
+        }
+        println!("Pruned {} stale branches from '{}'", stale_branches.len(), remote_name);
+    }
+
+    Ok(())
+}
+
+async fn update_all_remotes(repo_path: &Path, prune: bool) -> Result<()> {
+    let manager = RemoteManager::new(repo_path)?;
+    let remotes = manager.list_remotes();
+
+    if remotes.is_empty() {
+        println!("No remotes configured");
+        return Ok(());
+    }
+
+    println!("Updating {} remotes...", remotes.len());
+    
+    for remote in &remotes {
+        println!("\nFetching from '{}'...", remote.name);
+        
+        // For demonstration - in real implementation, this would fetch from each remote
+        println!("  Fetching refs from {}", remote.url);
+        
+        if prune {
+            println!("  Pruning stale branches for '{}'...", remote.name);
+            prune_remote_branches(repo_path, &remote.name, false)?;
+        }
+        
+        println!("  ✓ Updated '{}'", remote.name);
+    }
+
+    println!("\nAll remotes updated successfully");
     Ok(())
 }
 

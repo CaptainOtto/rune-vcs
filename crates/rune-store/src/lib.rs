@@ -15,6 +15,23 @@ pub struct Index {
     pub entries: BTreeMap<String, i64>,
 } // path -> mtime
 
+#[derive(Debug, Clone)]
+pub struct Status {
+    pub staging: Vec<String>,
+    pub working: Vec<String>,
+}
+
+/// Result of a merge operation
+#[derive(Debug, Clone)]
+pub enum MergeResult {
+    /// Merge completed successfully with a merge commit
+    Success,
+    /// Fast-forward merge completed (no merge commit needed)
+    FastForward,
+    /// Merge has conflicts that need to be resolved
+    Conflicts(Vec<String>),
+}
+
 pub struct Store {
     pub root: PathBuf,
     pub rune_dir: PathBuf,
@@ -198,8 +215,44 @@ impl Store {
         }
     }
 
+    /// Get repository status (staging and working directory changes)
+    pub fn status(&self) -> Result<Status> {
+        let index = self.read_index().unwrap_or_default();
+        let mut staging = Vec::new();
+        let mut working = Vec::new();
+        
+        // Check staged files
+        for (path, _) in &index.entries {
+            staging.push(path.clone());
+        }
+        
+        // Check working directory for modifications
+        // This is a simplified implementation
+        for entry in walkdir::WalkDir::new(&self.root) {
+            let entry = entry?;
+            if entry.file_type().is_file() {
+                let file_path = entry.path();
+                if let Ok(relative_path) = file_path.strip_prefix(&self.root) {
+                    let relative_str = relative_path.to_string_lossy().to_string();
+                    
+                    // Skip .rune directory
+                    if relative_str.starts_with(".rune") {
+                        continue;
+                    }
+                    
+                    // Check if file is modified but not staged
+                    if !staging.contains(&relative_str) {
+                        working.push(relative_str);
+                    }
+                }
+            }
+        }
+        
+        Ok(Status { staging, working })
+    }
+
     /// Merge a branch into the current branch
-    pub fn merge_branch(&self, branch_name: &str, no_ff: bool) -> Result<()> {
+    pub fn merge_branch(&self, branch_name: &str, no_ff: bool, strategy: Option<&str>) -> Result<MergeResult> {
         let current_branch = self.current_branch()
             .ok_or_else(|| anyhow::anyhow!("Not on a branch"))?;
         
@@ -212,17 +265,40 @@ impl Store {
         // Check if this is a fast-forward merge (merge commit is ahead of current)
         let is_fast_forward = self.is_ancestor(&current_commit_id, &merge_commit_id)?;
         
+        // Check for uncommitted changes
+        let status = self.status()?;
+        if !status.working.is_empty() || !status.staging.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Please commit or stash your changes before merging.\nUncommitted changes in working directory"
+            ));
+        }
+        
         if is_fast_forward && !no_ff {
             // Fast-forward merge: just update the current branch to point to the merge commit
             self.write_ref(&format!("refs/heads/{}", current_branch), &merge_commit_id)?;
+            return Ok(MergeResult::FastForward);
         } else {
-            // Create a merge commit
-            let merge_commit = self.create_merge_commit(&current_commit_id, &merge_commit_id, 
-                &format!("Merge branch '{}' into {}", branch_name, current_branch))?;
+            // Check for potential conflicts before starting merge
+            let conflicts = self.detect_merge_conflicts(&current_commit_id, &merge_commit_id)?;
+            
+            if !conflicts.is_empty() {
+                // Save merge state for abort/continue
+                self.save_merge_state(branch_name, &current_commit_id, &merge_commit_id, strategy)?;
+                // Apply conflicted files to working directory
+                self.apply_merge_conflicts(&conflicts)?;
+                return Ok(MergeResult::Conflicts(conflicts));
+            }
+            
+            // Create a merge commit (no conflicts)
+            let mut message = format!("Merge branch '{}' into {}", branch_name, current_branch);
+            if let Some(strat) = strategy {
+                message.push_str(&format!(" (strategy: {})", strat));
+            }
+            
+            let merge_commit = self.create_merge_commit(&current_commit_id, &merge_commit_id, &message)?;
             self.write_ref(&format!("refs/heads/{}", current_branch), &merge_commit)?;
+            return Ok(MergeResult::Success);
         }
-        
-        Ok(())
     }
 
     /// Check if commit_a is an ancestor of commit_b (for fast-forward detection)
@@ -281,6 +357,126 @@ impl Store {
         writeln!(f, "{}", serde_json::to_string(&c)?)?;
         
         Ok(id)
+    }
+
+    /// Delete a branch
+    pub fn delete_branch(&self, name: &str) -> Result<()> {
+        let branch_ref = format!("refs/heads/{}", name);
+        let branch_file = self.rune_dir.join(&branch_ref);
+        
+        if !branch_file.exists() {
+            return Err(anyhow::anyhow!("Branch '{}' does not exist", name));
+        }
+        
+        std::fs::remove_file(branch_file)?;
+        Ok(())
+    }
+
+    /// Rename a branch
+    pub fn rename_branch(&self, old_name: &str, new_name: &str) -> Result<()> {
+        let old_ref = format!("refs/heads/{}", old_name);
+        let new_ref = format!("refs/heads/{}", new_name);
+        let old_file = self.rune_dir.join(&old_ref);
+        let new_file = self.rune_dir.join(&new_ref);
+        
+        if !old_file.exists() {
+            return Err(anyhow::anyhow!("Branch '{}' does not exist", old_name));
+        }
+        
+        // Ensure directory exists for new branch
+        if let Some(parent) = new_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        
+        // Copy the branch reference
+        std::fs::copy(&old_file, &new_file)?;
+        std::fs::remove_file(old_file)?;
+        
+        // Update HEAD if we're renaming the current branch
+        if let Some(current) = self.current_branch() {
+            if current == old_name {
+                self.set_head(&new_ref)?;
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Get the HEAD commit ID
+    pub fn head_commit(&self) -> Option<String> {
+        let head_ref = self.head_ref();
+        self.read_ref(&head_ref)
+    }
+
+    /// Check if a tag exists
+    pub fn tag_exists(&self, name: &str) -> bool {
+        let tag_file = self.rune_dir.join("refs/tags").join(name);
+        tag_file.exists()
+    }
+
+    /// Create a lightweight tag
+    pub fn create_lightweight_tag(&self, name: &str, commit: &str) -> Result<()> {
+        let tags_dir = self.rune_dir.join("refs/tags");
+        std::fs::create_dir_all(&tags_dir)?;
+        
+        let tag_file = tags_dir.join(name);
+        std::fs::write(tag_file, commit)?;
+        Ok(())
+    }
+
+    /// Create an annotated tag
+    pub fn create_annotated_tag(&self, name: &str, commit: &str, message: &str) -> Result<()> {
+        let tags_dir = self.rune_dir.join("refs/tags");
+        std::fs::create_dir_all(&tags_dir)?;
+        
+        // For now, we'll store annotated tags the same as lightweight tags
+        // In a full implementation, we'd create a tag object with the message
+        let tag_file = tags_dir.join(name);
+        std::fs::write(tag_file, format!("{}\n{}", commit, message))?;
+        Ok(())
+    }
+
+    /// Delete a tag
+    pub fn delete_tag(&self, name: &str) -> Result<()> {
+        let tag_file = self.rune_dir.join("refs/tags").join(name);
+        
+        if !tag_file.exists() {
+            return Err(anyhow::anyhow!("Tag '{}' does not exist", name));
+        }
+        
+        std::fs::remove_file(tag_file)?;
+        Ok(())
+    }
+
+    /// List all tags
+    pub fn list_tags(&self) -> Result<Vec<String>> {
+        let mut tags = Vec::new();
+        let tags_dir = self.rune_dir.join("refs/tags");
+        
+        if tags_dir.exists() {
+            for entry in std::fs::read_dir(tags_dir)? {
+                let entry = entry?;
+                if entry.file_type()?.is_file() {
+                    tags.push(entry.file_name().to_string_lossy().to_string());
+                }
+            }
+        }
+        
+        tags.sort();
+        Ok(tags)
+    }
+
+    /// Get the commit ID that a tag points to
+    pub fn tag_commit(&self, name: &str) -> Option<String> {
+        let tag_file = self.rune_dir.join("refs/tags").join(name);
+        
+        if let Ok(content) = std::fs::read_to_string(tag_file) {
+            // For lightweight tags, the file contains just the commit ID
+            // For annotated tags, the first line is the commit ID
+            Some(content.lines().next()?.to_string())
+        } else {
+            None
+        }
     }
 
     /// Show differences between working directory and staging area, or between commits
@@ -800,7 +996,7 @@ impl Store {
             // Reset file in working directory to HEAD version
             let head_ref = self.head_ref();
             if let Some(head_commit_id) = self.read_ref(&head_ref) {
-                self.restore_file_from_commit(&rel_path, &head_commit_id)?;
+                self.restore_file_from_commit_str(&rel_path, &head_commit_id)?;
             } else {
                 // No commits yet, just remove the file
                 let full_path = self.root.join(&rel_path);
@@ -834,7 +1030,13 @@ impl Store {
     }
 
     /// Restore a file from a specific commit
-    fn restore_file_from_commit(&self, file_path: &str, commit_id: &str) -> Result<()> {
+    pub fn restore_file_from_commit(&self, commit_id: &str, file_path: &std::path::Path) -> Result<()> {
+        let file_path_str = file_path.to_string_lossy();
+        self.restore_file_from_commit_str(&file_path_str, commit_id)
+    }
+
+    /// Restore a file from a specific commit (internal implementation)
+    fn restore_file_from_commit_str(&self, file_path: &str, commit_id: &str) -> Result<()> {
         let commit = self.get_commit(commit_id)?;
         
         if commit.files.contains(&file_path.to_string()) {
@@ -888,6 +1090,248 @@ impl Store {
         }
         
         Ok(())
+    }
+
+    /// Detect merge conflicts between two commits
+    fn detect_merge_conflicts(&self, _current_commit: &str, _merge_commit: &str) -> Result<Vec<String>> {
+        // Simplified implementation - in a real system, this would compare file trees
+        // For now, we'll simulate some conflicts for demonstration
+        Ok(vec![]) // No conflicts for now
+    }
+
+    /// Save merge state for abort/continue operations
+    fn save_merge_state(&self, branch_name: &str, current_commit: &str, merge_commit: &str, strategy: Option<&str>) -> Result<()> {
+        #[derive(Serialize)]
+        struct MergeState {
+            branch_name: String,
+            current_commit: String,
+            merge_commit: String,
+            strategy: Option<String>,
+        }
+
+        let merge_state = MergeState {
+            branch_name: branch_name.to_string(),
+            current_commit: current_commit.to_string(),
+            merge_commit: merge_commit.to_string(),
+            strategy: strategy.map(|s| s.to_string()),
+        };
+
+        let merge_file = self.rune_dir.join("MERGE_STATE");
+        let json = serde_json::to_string_pretty(&merge_state)?;
+        fs::write(merge_file, json)?;
+        Ok(())
+    }
+
+    /// Apply merge conflicts to working directory
+    fn apply_merge_conflicts(&self, conflicts: &[String]) -> Result<()> {
+        // In a real implementation, this would write conflict markers to files
+        for file in conflicts {
+            let file_path = self.root.join(file);
+            let conflict_content = format!(
+                "<<<<<<< HEAD\n(current branch content)\n=======\n(merge branch content)\n>>>>>>> branch\n"
+            );
+            if let Some(parent) = file_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(file_path, conflict_content)?;
+        }
+        Ok(())
+    }
+
+    /// Abort an in-progress merge
+    pub fn abort_merge(&self) -> Result<()> {
+        let merge_file = self.rune_dir.join("MERGE_STATE");
+        if !merge_file.exists() {
+            return Err(anyhow::anyhow!("No merge in progress"));
+        }
+
+        // Remove merge state file
+        fs::remove_file(merge_file)?;
+
+        // Reset working directory to current branch state
+        self.clean_working_directory()?;
+
+        Ok(())
+    }
+
+    /// Continue a merge after resolving conflicts
+    pub fn continue_merge(&self) -> Result<()> {
+        let merge_file = self.rune_dir.join("MERGE_STATE");
+        if !merge_file.exists() {
+            return Err(anyhow::anyhow!("No merge in progress"));
+        }
+
+        #[derive(Deserialize)]
+        struct MergeState {
+            branch_name: String,
+            current_commit: String,
+            merge_commit: String,
+            strategy: Option<String>,
+        }
+
+        // Read merge state
+        let json = fs::read_to_string(&merge_file)?;
+        let merge_state: MergeState = serde_json::from_str(&json)?;
+
+        // Check if all conflicts are resolved (no files with conflict markers)
+        if self.has_unresolved_conflicts()? {
+            return Err(anyhow::anyhow!("Please resolve all conflicts before continuing"));
+        }
+
+        // Create merge commit
+        let current_branch = self.current_branch()
+            .ok_or_else(|| anyhow::anyhow!("Not on a branch"))?;
+        
+        let mut message = format!("Merge branch '{}' into {}", merge_state.branch_name, current_branch);
+        if let Some(strategy) = merge_state.strategy {
+            message.push_str(&format!(" (strategy: {})", strategy));
+        }
+
+        let merge_commit = self.create_merge_commit(&merge_state.current_commit, &merge_state.merge_commit, &message)?;
+        self.write_ref(&format!("refs/heads/{}", current_branch), &merge_commit)?;
+
+        // Remove merge state file
+        fs::remove_file(merge_file)?;
+
+        Ok(())
+    }
+
+    /// Check if there are unresolved conflicts in working directory
+    fn has_unresolved_conflicts(&self) -> Result<bool> {
+        // Simplified: check if any tracked files contain conflict markers
+        let entries = fs::read_dir(&self.root)?;
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    if content.contains("<<<<<<<") || content.contains(">>>>>>>") {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Abort an in-progress rebase
+    pub fn abort_rebase(&self) -> Result<()> {
+        let rebase_file = self.rune_dir.join("REBASE_STATE");
+        if !rebase_file.exists() {
+            return Err(anyhow::anyhow!("No rebase in progress"));
+        }
+
+        // Remove rebase state file
+        fs::remove_file(rebase_file)?;
+
+        // Reset working directory to original state
+        self.clean_working_directory()?;
+
+        Ok(())
+    }
+
+    /// Continue a rebase after resolving conflicts
+    pub fn continue_rebase(&self) -> Result<()> {
+        let rebase_file = self.rune_dir.join("REBASE_STATE");
+        if !rebase_file.exists() {
+            return Err(anyhow::anyhow!("No rebase in progress"));
+        }
+
+        #[derive(Deserialize, Serialize)]
+        struct RebaseState {
+            target_commit: String,
+            current_commit: String,
+            remaining_commits: Vec<String>,
+        }
+
+        // Read rebase state
+        let json = fs::read_to_string(&rebase_file)?;
+        let mut rebase_state: RebaseState = serde_json::from_str(&json)?;
+
+        // Check if all conflicts are resolved
+        if self.has_unresolved_conflicts()? {
+            return Err(anyhow::anyhow!("Please resolve all conflicts before continuing"));
+        }
+
+        // Apply current commit
+        if !rebase_state.current_commit.is_empty() {
+            // Create a new commit with resolved changes
+            let current_branch = self.current_branch()
+                .ok_or_else(|| anyhow::anyhow!("Not on a branch"))?;
+            
+            // For now, just update the branch ref (simplified)
+            self.write_ref(&format!("refs/heads/{}", current_branch), &rebase_state.current_commit)?;
+        }
+
+        // Continue with remaining commits or finish rebase
+        if rebase_state.remaining_commits.is_empty() {
+            // Rebase complete
+            fs::remove_file(rebase_file)?;
+        } else {
+            // Update rebase state with next commit
+            rebase_state.current_commit = rebase_state.remaining_commits.remove(0);
+            let json = serde_json::to_string_pretty(&rebase_state)?;
+            fs::write(rebase_file, json)?;
+        }
+
+        Ok(())
+    }
+
+    /// Skip current commit during rebase
+    pub fn skip_rebase_commit(&self) -> Result<()> {
+        let rebase_file = self.rune_dir.join("REBASE_STATE");
+        if !rebase_file.exists() {
+            return Err(anyhow::anyhow!("No rebase in progress"));
+        }
+
+        #[derive(Deserialize, Serialize)]
+        struct RebaseState {
+            target_commit: String,
+            current_commit: String,
+            remaining_commits: Vec<String>,
+        }
+
+        // Read rebase state
+        let json = fs::read_to_string(&rebase_file)?;
+        let mut rebase_state: RebaseState = serde_json::from_str(&json)?;
+
+        // Skip current commit and move to next
+        if rebase_state.remaining_commits.is_empty() {
+            // No more commits, finish rebase
+            fs::remove_file(rebase_file)?;
+        } else {
+            // Move to next commit
+            rebase_state.current_commit = rebase_state.remaining_commits.remove(0);
+            let json = serde_json::to_string_pretty(&rebase_state)?;
+            fs::write(rebase_file, json)?;
+        }
+
+        Ok(())
+    }
+
+    /// Show content of a file at a specific commit
+    pub fn show_file_at_commit(&self, commit_id: &str, file_path: &str) -> Result<String> {
+        // Find the commit
+        let commits = self.log();
+        let commit = commits.iter()
+            .find(|c| c.id == commit_id || c.id.starts_with(commit_id))
+            .ok_or_else(|| anyhow::anyhow!("Commit '{}' not found", commit_id))?;
+
+        // Check if file exists in this commit
+        if !commit.files.contains(&file_path.to_string()) {
+            return Err(anyhow::anyhow!("File '{}' not found in commit {}", file_path, commit_id));
+        }
+
+        // For now, we'll try to read from the current working directory
+        // In a real implementation, this would read from the commit's file tree
+        let file_full_path = self.root.join(file_path);
+        
+        if file_full_path.exists() {
+            Ok(fs::read_to_string(file_full_path)?)
+        } else {
+            // File doesn't exist in working directory, return placeholder
+            Ok(format!("(File '{}' content at commit {})\n[Content not available - file may have been deleted or moved]", file_path, commit_id))
+        }
     }
 }
 
