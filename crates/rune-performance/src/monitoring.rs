@@ -434,7 +434,7 @@ impl PerformanceMonitor {
 
     /// Check for performance regressions
     pub fn detect_regressions(&self) -> Vec<String> {
-        let mut regressions = Vec::new();
+        let regressions = Vec::new();
         
         // This would implement actual regression detection logic
         // comparing current metrics with historical baselines

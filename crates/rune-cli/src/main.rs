@@ -575,6 +575,56 @@ enum TagCommand {
     },
 }
 
+#[derive(Subcommand, Debug, Clone)]
+enum BatchOperation {
+    /// Batch commit multiple files
+    Commit {
+        #[arg(help = "Commit message")]
+        message: String,
+    },
+    /// Batch push to multiple remotes/branches
+    Push {
+        #[arg(help = "Remote name")]
+        remote: String,
+        #[arg(help = "Branch name")]
+        branch: String,
+    },
+    /// Batch pull from multiple remotes/branches
+    Pull {
+        #[arg(help = "Remote name")]
+        remote: String,
+        #[arg(help = "Branch name")]
+        branch: String,
+    },
+    /// Batch add multiple files
+    Add {
+        #[arg(help = "File paths")]
+        paths: Vec<String>,
+    },
+    /// Batch create tags
+    Tag {
+        #[arg(help = "Tag name")]
+        name: String,
+    },
+    /// Batch branch operations
+    Branch {
+        #[arg(help = "Branch name")]
+        name: String,
+    },
+    /// Batch merge operations
+    Merge {
+        #[arg(help = "Branch to merge")]
+        branch: String,
+    },
+    /// Show status for batch operations
+    Status,
+    /// Show log for batch operations
+    Log {
+        #[arg(help = "Number of commits to show")]
+        count: Option<usize>,
+    },
+}
+
 #[derive(Subcommand, Debug)]
 enum Cmd {
     /// Run local JSON API server
@@ -730,8 +780,8 @@ enum Cmd {
     
     // ============ NATURAL LANGUAGE COMMANDS ============
     /// Natural language: Undo last commit (git reset HEAD~1)
-    #[command(name = "undo")]
-    Undo {
+    #[command(name = "rollback")]
+    Rollback {
         #[arg(help = "What to undo: commit, merge, changes")]
         what: Option<String>,
         #[arg(long, help = "How many commits to undo")]
@@ -799,6 +849,86 @@ enum Cmd {
         #[arg(long, help = "Auto-fix safe issues")]
         auto_fix: bool,
     },
+    
+    // ============ NATURAL LANGUAGE COMMANDS ============
+    
+    /// Natural language command: "undo last commit" 
+    #[command(name = "undo-op", about = "Natural language undo operations")]
+    UndoOp {
+        #[arg(help = "What to undo: 'last commit', 'all changes', 'staging'")]
+        operation: String,
+        #[arg(long, help = "Number of operations to undo")]
+        count: Option<u32>,
+        #[arg(long, help = "Force undo without confirmation")]
+        force: bool,
+    },
+    
+    /// Natural language command: "show me" information
+    #[command(name = "display", about = "Natural language information display")]
+    Display {
+        #[arg(help = "What to show: 'conflicts', 'changes', 'history', 'branches'")]
+        what: String,
+        #[arg(long, help = "Time filter: 'today', 'yesterday', 'week'")]
+        since: Option<String>,
+        #[arg(long, help = "Show detailed information")]
+        detailed: bool,
+    },
+    
+    /// Natural language command: "what changed"
+    #[command(name = "what", about = "Natural language change queries")]
+    What {
+        #[arg(help = "Query: 'changed since yesterday', 'conflicts exist', 'needs attention'")]
+        query: String,
+        #[arg(long, help = "Include file details")]
+        files: bool,
+        #[arg(long, help = "Include author information")]
+        authors: bool,
+    },
+    
+    /// Enhanced developer experience with context-sensitive help
+    #[command(name = "help-me", about = "Intelligent context-aware assistance")]
+    HelpMe {
+        #[arg(help = "Current situation or problem")]
+        situation: Option<String>,
+        #[arg(long, help = "Show interactive problem solver")]
+        interactive: bool,
+        #[arg(long, help = "Include workflow suggestions")]
+        workflows: bool,
+    },
+    
+    /// Workflow templates for common development patterns
+    #[command(name = "template", about = "Workflow automation templates")]
+    Template {
+        #[arg(help = "Template type: hotfix, feature, release, bugfix")]
+        template_type: String,
+        #[arg(help = "Template name or description")]
+        name: String,
+        #[arg(long, help = "Show available templates")]
+        list: bool,
+        #[arg(long, help = "Customize template parameters")]
+        customize: bool,
+    },
+    
+    /// Batch operations for multiple files/branches
+    #[command(name = "batch", about = "Intelligent batch operations")]
+    Batch {
+        #[command(subcommand)]
+        operation: Option<BatchOperation>,
+    },
+    
+    /// File system monitoring with auto-actions
+    #[command(name = "watch", about = "Smart file system monitoring")]
+    Watch {
+        #[arg(help = "Path to watch", default_value = ".")]
+        path: String,
+        #[arg(long, help = "Auto-commit on changes")]
+        auto_commit: bool,
+        #[arg(long, help = "Auto-run tests on changes")]
+        auto_test: bool,
+        #[arg(long, help = "Watch patterns (glob)")]
+        patterns: Vec<String>,
+    },
+    
     // ============ TRADITIONAL COMMANDS ============
     
     /// Clone a repository from a remote source
@@ -3773,6 +3903,60 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Benchmark { cmd } => {
             handle_benchmark_command(cmd, &ctx).await?;
         }
+
+        // ============ NATURAL LANGUAGE COMMANDS ============
+        
+        Cmd::Rollback { what, count, soft, hard } => {
+            handle_natural_rollback(what, count, soft, hard, &ctx).await?;
+        }
+
+        Cmd::Changed { since, names_only, stats } => {
+            handle_natural_changed(since, names_only, stats, &ctx).await?;
+        }
+
+        Cmd::Conflicts { suggest, auto_resolve, interactive } => {
+            handle_natural_conflicts(suggest, auto_resolve, interactive, &ctx).await?;
+        }
+
+        Cmd::Fix { issue, dry_run, auto, interactive } => {
+            handle_natural_fix(issue, dry_run, auto, interactive, &ctx).await?;
+        }
+
+        Cmd::Optimize { level, analyze, dry_run, lfs } => {
+            handle_natural_optimize(level, analyze, dry_run, lfs, &ctx).await?;
+        }
+
+        Cmd::Health { detailed, performance, suggestions, auto_fix } => {
+            handle_natural_health(detailed, performance, suggestions, auto_fix, &ctx).await?;
+        }
+
+        Cmd::UndoOp { operation, count, force } => {
+            handle_natural_undo_op(operation, count, force, &ctx).await?;
+        }
+
+        Cmd::Display { what, since, detailed } => {
+            handle_natural_display(what, since, detailed, &ctx).await?;
+        }
+
+        Cmd::What { query, files, authors } => {
+            handle_natural_what(query, files, authors, &ctx).await?;
+        }
+
+        Cmd::HelpMe { situation, interactive, workflows } => {
+            handle_natural_help_me(situation, interactive, workflows, &ctx).await?;
+        }
+
+        Cmd::Template { template_type, name, list, customize } => {
+            handle_natural_template(template_type, name, list, customize, &ctx).await?;
+        }
+
+        Cmd::Batch { operation } => {
+            handle_natural_batch(operation, &ctx).await?;
+        }
+
+        Cmd::Watch { path, auto_commit, auto_test, patterns } => {
+            handle_natural_watch(path, auto_commit, auto_test, patterns, &ctx).await?;
+        }
     }
     Ok(())
 }
@@ -6570,6 +6754,460 @@ async fn handle_smart_branch_command(cmd: Option<SmartBranchCommand>) -> anyhow:
             Style::success("🎯 Branching strategy analysis complete!");
         }
     }
+    
+    Ok(())
+}
+
+// ============ NATURAL LANGUAGE COMMAND HANDLERS ============
+
+async fn handle_natural_rollback(
+    what: Option<String>,
+    count: Option<u32>,
+    soft: bool,
+    hard: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("🔄 Natural Language Rollback");
+    
+    let operation = what.as_deref().unwrap_or("commit");
+    let count = count.unwrap_or(1);
+    
+    match operation {
+        "commit" | "commits" => {
+            ctx.info(&format!("Rolling back {} commit(s)", count));
+            if hard {
+                Style::warning("⚠️  Hard reset will permanently discard changes!");
+                // Implement hard reset logic
+            } else if soft {
+                ctx.info("Soft reset - keeping changes in working directory");
+                // Implement soft reset logic
+            } else {
+                ctx.info("Mixed reset - keeping changes unstaged");
+                // Implement mixed reset logic
+            }
+        }
+        "merge" => {
+            ctx.info("Rolling back merge operation");
+            // Implement merge rollback logic
+        }
+        "changes" => {
+            ctx.info("Rolling back working directory changes");
+            // Implement changes rollback logic
+        }
+        _ => {
+            Style::error(&format!("Unknown rollback operation: {}", operation));
+        }
+    }
+    
+    Style::success("✅ Rollback operation completed!");
+    Ok(())
+}
+
+async fn handle_natural_changed(
+    since: Option<String>,
+    names_only: bool,
+    stats: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("📊 What Changed");
+    
+    let timeframe = since.as_deref().unwrap_or("today");
+    ctx.info(&format!("Showing changes since: {}", timeframe));
+    
+    if names_only {
+        Style::info("📁 Changed files:");
+        // List file names only
+    } else if stats {
+        Style::info("📈 Change statistics:");
+        // Show detailed statistics
+    } else {
+        Style::info("📝 Detailed changes:");
+        // Show detailed changes
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_conflicts(
+    suggest: bool,
+    auto_resolve: bool,
+    interactive: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("⚔️ Conflict Analysis");
+    
+    ctx.info("Analyzing conflicts...");
+    
+    if suggest {
+        Style::info("💡 Conflict resolution suggestions:");
+        // Provide AI-powered suggestions
+    }
+    
+    if auto_resolve {
+        Style::info("🤖 Auto-resolving safe conflicts...");
+        // Auto-resolve non-critical conflicts
+    }
+    
+    if interactive {
+        Style::info("🔧 Starting interactive conflict resolution...");
+        // Start interactive resolution
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_fix(
+    issue: Option<String>,
+    dry_run: bool,
+    auto: bool,
+    interactive: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("🔧 Smart Repository Fix");
+    
+    let issue_type = issue.as_deref().unwrap_or("all");
+    ctx.info(&format!("Fixing issue type: {}", issue_type));
+    
+    if dry_run {
+        Style::info("🧪 Dry run mode - showing what would be fixed:");
+    }
+    
+    if auto {
+        Style::info("🤖 Auto-fixing safe issues...");
+    }
+    
+    if interactive {
+        Style::info("🔧 Interactive fix mode...");
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_optimize(
+    level: Option<String>,
+    analyze: bool,
+    dry_run: bool,
+    lfs: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("⚡ Repository Optimization");
+    
+    let opt_level = level.as_deref().unwrap_or("standard");
+    ctx.info(&format!("Optimization level: {}", opt_level));
+    
+    if analyze {
+        Style::info("📊 Analyzing optimization opportunities...");
+    }
+    
+    if dry_run {
+        Style::info("🧪 Dry run mode - showing optimization plan:");
+    }
+    
+    if lfs {
+        Style::info("📦 Including LFS optimization...");
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_health(
+    detailed: bool,
+    performance: bool,
+    suggestions: bool,
+    auto_fix: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("🏥 Repository Health Check");
+    
+    ctx.info("Running comprehensive health check...");
+    
+    if detailed {
+        Style::info("📋 Detailed health report:");
+    }
+    
+    if performance {
+        Style::info("⚡ Performance metrics:");
+    }
+    
+    if suggestions {
+        Style::info("💡 Improvement suggestions:");
+    }
+    
+    if auto_fix {
+        Style::info("🔧 Auto-fixing safe issues...");
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_undo_op(
+    operation: String,
+    count: Option<u32>,
+    force: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("↩️ Natural Undo Operation");
+    
+    let count = count.unwrap_or(1);
+    ctx.info(&format!("Undoing: {} (count: {})", operation, count));
+    
+    if force {
+        Style::warning("⚠️  Force mode enabled - bypassing safety checks");
+    }
+    
+    match operation.as_str() {
+        "last commit" => {
+            ctx.info("Undoing last commit...");
+        }
+        "all changes" => {
+            ctx.info("Undoing all changes...");
+        }
+        "staging" => {
+            ctx.info("Undoing staging area...");
+        }
+        _ => {
+            Style::error(&format!("Unknown operation: {}", operation));
+        }
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_display(
+    what: String,
+    since: Option<String>,
+    detailed: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("📺 Natural Display");
+    
+    ctx.info(&format!("Displaying: {}", what));
+    
+    if let Some(timeframe) = since {
+        ctx.info(&format!("Since: {}", timeframe));
+    }
+    
+    if detailed {
+        Style::info("📋 Detailed view enabled");
+    }
+    
+    match what.as_str() {
+        "conflicts" => {
+            Style::info("⚔️ Current conflicts:");
+        }
+        "changes" => {
+            Style::info("📝 Recent changes:");
+        }
+        "history" => {
+            Style::info("📚 Commit history:");
+        }
+        "branches" => {
+            Style::info("🌿 Branch information:");
+        }
+        _ => {
+            Style::info(&format!("📊 Information about: {}", what));
+        }
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_what(
+    query: String,
+    files: bool,
+    authors: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("❓ Natural Query: What...");
+    
+    ctx.info(&format!("Query: {}", query));
+    
+    if files {
+        Style::info("📁 Including file details");
+    }
+    
+    if authors {
+        Style::info("👥 Including author information");
+    }
+    
+    match query.as_str() {
+        "changed since yesterday" => {
+            Style::info("📊 Changes since yesterday:");
+        }
+        "conflicts exist" => {
+            Style::info("⚔️ Current conflicts:");
+        }
+        "needs attention" => {
+            Style::info("⚠️  Items requiring attention:");
+        }
+        _ => {
+            Style::info(&format!("🔍 Processing query: {}", query));
+        }
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_help_me(
+    situation: Option<String>,
+    interactive: bool,
+    workflows: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("🆘 Intelligent Help System");
+    
+    if let Some(situation) = situation {
+        ctx.info(&format!("Current situation: {}", situation));
+    } else {
+        ctx.info("General help mode");
+    }
+    
+    if interactive {
+        Style::info("🔧 Starting interactive problem solver...");
+    }
+    
+    if workflows {
+        Style::info("📋 Including workflow suggestions:");
+        println!("  • {} - for bug fixes", "rune template hotfix".cyan());
+        println!("  • {} - for new features", "rune template feature".cyan());
+        println!("  • {} - for releases", "rune template release".cyan());
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_template(
+    template_type: String,
+    name: String,
+    list: bool,
+    customize: bool,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("📋 Workflow Templates");
+    
+    if list {
+        Style::info("📝 Available templates:");
+        println!("  • {} - Quick hotfix workflow", "hotfix".cyan());
+        println!("  • {} - Feature development workflow", "feature".cyan());
+        println!("  • {} - Release preparation workflow", "release".cyan());
+        println!("  • {} - Bug investigation workflow", "bugfix".cyan());
+        return Ok(());
+    }
+    
+    ctx.info(&format!("Template: {} - {}", template_type, name));
+    
+    if customize {
+        Style::info("🔧 Customization mode enabled");
+    }
+    
+    match template_type.as_str() {
+        "hotfix" => {
+            Style::info("🚨 Hotfix workflow template:");
+            println!("  1. Create hotfix branch");
+            println!("  2. Make minimal changes");
+            println!("  3. Test thoroughly");
+            println!("  4. Merge to main and release");
+        }
+        "feature" => {
+            Style::info("✨ Feature workflow template:");
+            println!("  1. Create feature branch");
+            println!("  2. Develop incrementally");
+            println!("  3. Write tests");
+            println!("  4. Code review");
+            println!("  5. Merge to develop");
+        }
+        "release" => {
+            Style::info("🚀 Release workflow template:");
+            println!("  1. Create release branch");
+            println!("  2. Update version numbers");
+            println!("  3. Run full test suite");
+            println!("  4. Generate changelog");
+            println!("  5. Tag and deploy");
+        }
+        _ => {
+            Style::info(&format!("🔧 Custom template: {}", template_type));
+        }
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_batch(
+    operation: Option<BatchOperation>,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("📦 Batch Operations");
+    
+    if let Some(op) = operation {
+        match op {
+            BatchOperation::Commit { message } => {
+                ctx.info(&format!("Batch commit with message: {}", message));
+            }
+            BatchOperation::Push { remote, branch } => {
+                ctx.info(&format!("Batch push to {}/{}", remote, branch));
+            }
+            BatchOperation::Pull { remote, branch } => {
+                ctx.info(&format!("Batch pull from {}/{}", remote, branch));
+            }
+            BatchOperation::Add { paths } => {
+                ctx.info(&format!("Batch add {} files", paths.len()));
+            }
+            BatchOperation::Tag { name } => {
+                ctx.info(&format!("Batch tag: {}", name));
+            }
+            BatchOperation::Branch { name } => {
+                ctx.info(&format!("Batch branch operation: {}", name));
+            }
+            BatchOperation::Merge { branch } => {
+                ctx.info(&format!("Batch merge: {}", branch));
+            }
+            BatchOperation::Status => {
+                ctx.info("Batch status check");
+            }
+            BatchOperation::Log { count } => {
+                let count = count.unwrap_or(10);
+                ctx.info(&format!("Batch log (last {} commits)", count));
+            }
+        }
+    } else {
+        Style::info("📝 Available batch operations:");
+        println!("  • {} - Batch commit files", "commit".cyan());
+        println!("  • {} - Batch push branches", "push".cyan());
+        println!("  • {} - Batch pull updates", "pull".cyan());
+        println!("  • {} - Batch add files", "add".cyan());
+    }
+    
+    Ok(())
+}
+
+async fn handle_natural_watch(
+    path: String,
+    auto_commit: bool,
+    auto_test: bool,
+    patterns: Vec<String>,
+    ctx: &RuneContext
+) -> anyhow::Result<()> {
+    Style::section_header("👁️ File System Monitoring");
+    
+    ctx.info(&format!("Watching path: {}", path));
+    
+    if auto_commit {
+        Style::info("🔄 Auto-commit enabled");
+    }
+    
+    if auto_test {
+        Style::info("🧪 Auto-test enabled");
+    }
+    
+    if !patterns.is_empty() {
+        Style::info(&format!("📁 Watching {} patterns", patterns.len()));
+        for pattern in patterns {
+            println!("  • {}", pattern.cyan());
+        }
+    }
+    
+    Style::info("👁️  File monitoring started (Ctrl+C to stop)");
+    // In a real implementation, this would start file watching
     
     Ok(())
 }

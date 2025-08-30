@@ -318,7 +318,7 @@ mod tests {
     fn test_password_policy() {
         let auth_manager = AuthenticationManager::new(AuthConfig::default());
         
-        assert!(auth_manager.check_password_policy("Pass123").is_ok());
+        assert!(auth_manager.check_password_policy("Pass1234").is_ok());
         assert!(auth_manager.check_password_policy("weak").is_err());
         assert!(auth_manager.check_password_policy("nouppercase123").is_err());
     }

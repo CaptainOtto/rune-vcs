@@ -5,11 +5,10 @@ use anyhow::Result;
 use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::io::{Read, Write};
-use flate2::{Compression, write::GzEncoder, read::GzDecoder};
+use std::path::Path;
+use std::io::Write;
+use flate2::{Compression, write::GzEncoder};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Network and storage optimization engine
 pub struct NetworkStorageEngine {

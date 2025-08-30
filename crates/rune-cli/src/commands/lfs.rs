@@ -270,11 +270,11 @@ pub async fn run(cmd: LfsCmd) -> Result<()> {
                 }
             }
         }
-        LfsCmd::Cleanup { max_age_hours } => {
+        LfsCmd::Cleanup { max_age_hours: _ } => {
             let lfs = Lfs::open(std::env::current_dir()?)?;
             
             println!("🧹 Cleaning up LFS storage...");
-            let orphaned = lfs.cleanup_orphaned_chunks()?;
+            let _orphaned = lfs.cleanup_orphaned_chunks()?;
             
             // Clean up stale locks using the existing locking system
             let mut lock_manager = rune_lfs::locking::LockManager::new();

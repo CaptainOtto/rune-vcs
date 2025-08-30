@@ -12,19 +12,19 @@ fn get_rune_binary() -> String {
         .parent() // workspace root
         .unwrap();
     
-    let binary_path = workspace_dir.join("target/debug/rune-cli");
+    let binary_path = workspace_dir.join("target/debug/rune");
     let binary_path_str = binary_path.to_string_lossy().to_string();
     
     // Build the binary if it doesn't exist
     if !binary_path.exists() {
         let output = Command::new("cargo")
-            .args(&["build", "--bin", "rune-cli"])
+            .args(&["build", "--bin", "rune"])
             .current_dir(workspace_dir)
             .output()
-            .expect("Failed to build rune-cli binary");
+            .expect("Failed to build rune binary");
         
         if !output.status.success() {
-            panic!("Failed to build rune-cli: {}", String::from_utf8_lossy(&output.stderr));
+            panic!("Failed to build rune: {}", String::from_utf8_lossy(&output.stderr));
         }
     }
     
@@ -122,5 +122,5 @@ fn test_help_and_version() {
     let output = run_rune_command(&["--version"], temp_dir.path());
     assert!(output.status.success(), "Version command should succeed. stderr: {}", String::from_utf8_lossy(&output.stderr));
     let version_text = String::from_utf8_lossy(&output.stdout);
-    assert!(version_text.contains("0.0.1"), "Version should contain version number");
+    assert!(version_text.contains("0.3.0-alpha.4"), "Version should contain version number");
 }

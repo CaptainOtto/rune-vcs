@@ -2,7 +2,6 @@
 
 use handlebars::Handlebars;
 use serde_json::json;
-use std::collections::HashMap;
 
 /// Initialize Handlebars template engine with built-in templates
 pub fn init_templates() -> Handlebars<'static> {

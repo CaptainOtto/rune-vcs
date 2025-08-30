@@ -5,7 +5,6 @@ use anyhow::Result;
 use std::time::{Duration, Instant};
 use std::sync::Arc;
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use colored::*;
 
 /// Performance metrics and optimization engine

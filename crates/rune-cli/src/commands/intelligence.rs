@@ -1,5 +1,5 @@
 use crate::intelligence::{
-    IntelligentFileAnalyzer, IntelligenceConfig, PredictiveInsight,
+    IntelligentFileAnalyzer, IntelligenceConfig,
     HealthStatus, CachePriority
 };
 use std::path::Path;
