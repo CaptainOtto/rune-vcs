@@ -1,17 +1,10 @@
 class Rune < Formula
-  desc "Modern, intelligent version control system"
-  homepage "https://github.com/Johan-Ott/rune-vcs"
-  url "https://github.com/Johan-Ott/rune-vcs/releases/download/v0.3.0-alpha.4/rune-0.3.0-alpha.4-x86_64-apple-darwin.tar.gz"
-  sha256 "02a35b8277bcb52872c65b38709ba0aba5bc59dcbadf1a9693c61d2b71a55fd8"
-  license "Apache-2.0"
-  version "0.3.0-alpha.4"
-
-  on_arm do
-    url "https://github.com/Johan-Ott/rune-vcs/releases/download/v0.3.0-alpha.4/rune-0.3.0-alpha.4-aarch64-apple-darwin.tar.gz"
-    sha256 "402c9e99320e4452d9ddaa5aff6b8a2134fef31e3649d0cfd3caa807534ef0bd"
-  end
-
-  depends_on "rust" => :build
+  desc "Revolutionary AI-powered version control system with natural language interface"
+  homepage "https://github.com/CaptainOtto/rune-vcs"
+  url "https://github.com/CaptainOtto/rune-vcs/releases/download/v0.3.1-alpha.5/rune-v0.3.1-alpha.5-aarch64-apple-darwin.tar.gz"
+  sha256 "7f8f000d5e878848e6b6e17605d6a7fda0a5c308b078ca7a58eed8a7c7b2c2ad"
+  license "MIT"
+  version "0.3.1-alpha.5"
 
   def install
     bin.install "rune"
